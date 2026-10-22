@@ -619,9 +619,9 @@ function renderEditor(){
   </section>
   <section class="sec" id="secShare"><h2><span class="n">06</span>共有の設定</h2>
     <p class="help">号のデータと写真を社内のGitHubプライベートリポジトリに保存し、複数のスタッフで同じ号を開いて修正できます。設定はこのパソコンのブラウザにだけ保存されます。</p>
-    <label class="f"><span>自分の名前(保存者として表示)</span><input type="text" data-cfg="name" value="${esc(CFG.name)}"></label>
-    <label class="f"><span>リポジトリ(例:kitazume3432/smileclub-data)</span><input type="text" data-cfg="repo" value="${esc(CFG.repo)}"></label>
-    <label class="f"><span>アクセストークン</span><input type="password" data-cfg="token" value="${esc(CFG.token)}" autocomplete="off"></label>
+    <label class="f"><span>自分の名前(保存者として表示)</span><input type="text" data-cfg="name" value="${esc(CFG.name)}" autocomplete="off" name="sc-staff-name"></label>
+    <label class="f"><span>リポジトリ(例:kitazume3432/smileclub-data)</span><input type="text" data-cfg="repo" value="${esc(CFG.repo)}" autocomplete="off" name="sc-repo" placeholder="kitazume3432/smileclub-data"></label>
+    <label class="f"><span>アクセストークン</span><input type="password" data-cfg="token" value="${esc(CFG.token)}" autocomplete="new-password" name="sc-gh-token" placeholder="github_pat_で始まる文字列"></label>
     <div class="row"><button class="btn sm" data-act="testShare">接続を確認</button><span class="help" id="testRes"></span></div>
   </section>`;
   checkOverflow();
@@ -652,7 +652,7 @@ ed.addEventListener('input',e=>{
   if(t.dataset.struct)renderEditor();
   save();schedulePreview();
 });
-ed.addEventListener('input',e=>{const k=e.target.dataset.cfg;if(!k)return;CFG[k]=e.target.value.trim();saveCfg()});
+ed.addEventListener('input',e=>{const k=e.target.dataset.cfg;if(!k)return;let v=e.target.value.trim();if(k==='repo')v=v.replace(/^https?:\/\/github\.com\//i,'').replace(/\.git$/,'').replace(/\/+$/,'');CFG[k]=v;saveCfg()});
 ed.addEventListener('change',async e=>{
   const t=e.target;
   if(t.type==='checkbox'&&t.dataset.scope){const sc=t.dataset.scope;const obj=sc==='meta'?S.meta:sc==='header'?S.header:findBlock(t.dataset.bid)?.b;setPath(obj,t.dataset.path,t.checked);
@@ -698,7 +698,7 @@ document.addEventListener('click',e=>{
     case 'openShared':listShared();return;
     case 'openIssue':openShared(el.dataset.path);return;
     case 'mclose':$('#modal').hidden=true;return;
-    case 'testShare':(async()=>{const t=$('#testRes');t.textContent='確認中…';try{const r=await fetch(`https://api.github.com/repos/${CFG.repo}`,{headers:GH.h(),cache:'no-store'});if(!r.ok)throw new Error(await errMsg(r));const j=await r.json();t.textContent=j.private?(j.permissions&&j.permissions.push===false?'読み取りのみ可能です(保存はできません)':'接続できました'):'接続できましたが、公開リポジトリです。プライベートにしてください';}catch(e){t.textContent=e.message}})();return;
+    case 'testShare':(async()=>{const t=$('#testRes');if(!/^[\w.-]+\/[\w.-]+$/.test(CFG.repo)){t.textContent='リポジトリは「kitazume3432/smileclub-data」の形で入力してください。';return}if(!/^(github_pat_|ghp_)/.test(CFG.token)){t.textContent='トークンは「github_pat_」で始まる文字列を貼り付けてください。';return}t.textContent='確認中…';try{const r=await fetch(`https://api.github.com/repos/${CFG.repo}`,{headers:GH.h(),cache:'no-store'});if(!r.ok)throw new Error(await errMsg(r));const j=await r.json();t.textContent=j.private?(j.permissions&&j.permissions.push===false?'読み取りのみ可能です(保存はできません)':'接続できました'):'接続できましたが、公開リポジトリです。プライベートにしてください';}catch(e){t.textContent=e.message}})();return;
     default:return;
   }
   save();renderEditor();renderPreview();
