@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宛名ラベル作成(すまいるくらぶ)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>@page{size:A4;margin:0}</style>
+<style>
+:root{--bg:#f3eee5;--panel:#fbf8f2;--ink:#232323;--wood:#AD8A5C;--line:#e1d6c4;--muted:#6b6256;--field:#fff;--warn:#b3261e;--ok:#2f7a52;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1a17;--panel:#26231f;--ink:#ece6dc;--wood:#c9a678;--line:#3b352d;--muted:#a59c8f;--field:#1f1d1a;--warn:#f2857c;--ok:#7cc79b;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Yu Gothic","游ゴシック",YuGothic,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:14px}
+button,input,select{font:inherit;color:inherit}
+.top{height:56px;display:flex;align-items:center;gap:12px;padding:0 20px;background:#232323;color:#f3eee5}
+.top h1{font-size:16px;margin:0}
+.top .sp{flex:1}
+.top a{color:#f3eee5;font-size:13px}
+.btn{border:1px solid var(--wood);background:transparent;color:inherit;padding:7px 14px;border-radius:4px;cursor:pointer}
+.btn:hover{background:rgba(173,138,92,.15)}
+.btn.pri{background:var(--wood);color:#fff}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--wood);outline-offset:1px}
+.app{display:grid;grid-template-columns:480px 1fr;height:calc(100% - 56px)}
+.editor{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:8px 18px 60px}
+.sec{border-bottom:1px solid var(--line);padding:16px 0}
+.sec h2{display:flex;align-items:baseline;gap:10px;font-size:15px;margin:0 0 12px}
+.sec h2 .n{font-size:22px;color:var(--wood);font-weight:700;font-family:Georgia,serif}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.f{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.f>span{font-size:12px;color:var(--muted)}
+input[type=number],input[type=text],select{background:var(--field);border:1px solid var(--line);border-radius:4px;padding:6px 8px;width:100%}
+.help{font-size:12px;color:var(--muted);line-height:1.6;margin:4px 0 8px}
+.drop{border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--muted);cursor:pointer}
+.drop.on{border-color:var(--wood);background:rgba(173,138,92,.08)}
+.file{border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;background:var(--field)}
+.file .hd{display:flex;gap:8px;align-items:center}
+.file .hd b{flex:1;font-size:13px;word-break:break-all}
+.maps{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;margin-top:8px}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.sum div{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:8px;text-align:center}
+.sum b{display:block;font-size:20px}
+.sum span{font-size:11px;color:var(--muted)}
+.tbl{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--field);scrollbar-width:none}
+.tbl::-webkit-scrollbar{display:none}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{position:sticky;top:0;background:var(--panel);font-weight:700}
+tr.off td{opacity:.45}
+.tag{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;background:var(--warn);color:#fff;margin:1px 2px 0 0}
+.tag.dup{background:#8a6d3b}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px}
+.preview{overflow:auto;padding:24px}
+.pages{display:flex;flex-wrap:wrap;gap:24px;justify-content:center}
+.pv{flex:none;position:relative}
+.pv .lbl{position:absolute;top:-19px;left:0;font-size:12px;color:var(--muted)}
+.empty{color:var(--muted);text-align:center;margin-top:80px;line-height:1.8}
+/* ラベル */
+.sheet{width:210mm;height:297mm;background:#fff;color:#111;position:relative;transform-origin:top left;box-shadow:0 2px 14px rgba(0,0,0,.18);font-family:"Yu Gothic","游ゴシック",YuGothic,"Noto Sans JP",sans-serif;overflow:hidden}
+.lb{position:absolute;padding:2.6mm 3.2mm 2.2mm;display:flex;flex-direction:column;overflow:hidden;line-height:1.3}
+.sheet.frame .lb{outline:.2mm solid #999;outline-offset:-.1mm}
+.lb .zp{font-size:.95em;letter-spacing:.03em}
+.lb .ad{font-size:1em;margin-top:.4mm;word-break:break-all}
+.lb .co{font-size:1em;margin-top:.6mm;white-space:nowrap;overflow:hidden}
+.lb .nm{margin-top:auto;font-size:1.4em;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;padding-bottom:.3mm}
+.lb .no{position:absolute;right:1.2mm;top:.8mm;font-size:6pt;color:#999}
+@media (max-width:900px){.app{grid-template-columns:1fr;height:auto}}
+@media print{
+  html,body{background:#fff;height:auto}
+  .top,.editor,.pv .lbl{display:none!important}
+  .app{display:block;height:auto}.preview{padding:0;overflow:visible}.pages{display:block}
+  .pv{width:auto!important;height:auto!important;break-after:page;page-break-after:always}
+  .pv:last-child{break-after:auto;page-break-after:auto}
+  .sheet{transform:none!important;box-shadow:none}
+  .lb .no{display:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>宛名ラベル作成</h1>
+  <a href="index.html">← すまいるくらぶ作成ツールへ</a>
+  <span class="sp"></span>
+  <button class="btn" data-act="testPrint">位置合わせ用テスト印刷</button>
+  <button class="btn pri" data-act="print">ラベルを印刷</button>
+</header>
+<div class="app">
+  <aside class="editor" id="editor">
+    <section class="sec"><h2><span class="n">01</span>名簿を読み込む</h2>
+      <div class="drop" id="drop">ANDPADから出力した名簿(Excel・CSV)をここにドラッグ<br>またはクリックして選択(複数可)</div>
+      <input type="file" id="fileIn" accept=".csv,.xlsx,.xls,.txt" multiple hidden>
+      <p class="help">見込み客とOB客など、複数のファイルをまとめて読み込めます。名簿のデータはこのパソコンの画面の中だけで処理し、どこにも送信・保存しません(画面を閉じると消えます)。</p>
+      <div id="files"></div>
+    </section>
+    <section class="sec"><h2><span class="n">02</span>宛先の確認</h2>
+      <div class="sum" id="sum"></div>
+      <div class="row"><label class="f"><span>並び順</span><select id="sortSel"><option value="file">読み込んだ順</option><option value="zip">郵便番号順</option></select></label><label class="f"><span>絞り込み</span><select id="filterSel"><option value="all">すべて</option><option value="issue">要確認のみ</option><option value="off">印刷しないもののみ</option></select></label></div>
+      <div class="tbl" id="tbl"></div>
+      <p class="help">重複している宛先(郵便番号・住所・氏名が同じもの)は、2件目以降のチェックを自動で外しています。チェックを外した行は印刷しません。</p>
+    </section>
+    <section class="sec"><h2><span class="n">03</span>シールの設定</h2>
+      <div class="row"><label class="f"><span>印刷を始める位置(途中まで使ったシート用)</span><select id="startSel"></select></label></div>
+      <div class="row"><label class="f"><span>上下の位置調整(mm、+で下へ)</span><input type="number" step="0.5" data-cfg="offY"></label><label class="f"><span>左右の位置調整(mm、+で右へ)</span><input type="number" step="0.5" data-cfg="offX"></label></div>
+      <div class="row"><label class="f"><span>文字の大きさ(pt)</span><input type="number" step="0.5" min="6" max="12" data-cfg="font"></label><label class="f"><span>会社名の敬称</span><select data-cfg="corpHon"><option value="御中">御中</option><option value="様">様</option></select></label></div>
+      <details><summary class="help" style="cursor:pointer">シールの寸法(アスクル マルチプリンタラベル 24面 AR9-0786)</summary>
+        <div class="row" style="margin-top:8px"><label class="f"><span>列数</span><input type="number" data-cfg="cols"></label><label class="f"><span>行数</span><input type="number" data-cfg="rows"></label><label class="f"><span>幅(mm)</span><input type="number" step="0.1" data-cfg="w"></label><label class="f"><span>高さ(mm)</span><input type="number" step="0.1" data-cfg="h"></label></div>
+        <div class="row"><label class="f"><span>上余白(mm)</span><input type="number" step="0.1" data-cfg="top"></label><label class="f"><span>左余白(mm)</span><input type="number" step="0.1" data-cfg="left"></label><label class="f"><span>横の間隔(mm)</span><input type="number" step="0.1" data-cfg="gapX"></label><label class="f"><span>縦の間隔(mm)</span><input type="number" step="0.1" data-cfg="gapY"></label></div>
+        <button class="btn sm" data-act="resetCfg">初期値に戻す</button>
+      </details>
+      <p class="help">はじめに「位置合わせ用テスト印刷」を普通紙に印刷し、シールのシートと重ねて光にすかして確認してください。ずれていたら上の「位置調整」で直します。印刷画面では「倍率:100%(実際のサイズ)」「余白:なし」にしてください。設定はこのパソコンに保存されます。</p>
+    </section>
+    <section class="sec"><h2><span class="n">04</span>出力</h2>
+      <div class="row"><button class="btn pri" data-act="print">ラベルを印刷</button><button class="btn" data-act="csv">整理済みの名簿をCSVで保存</button></div>
+      <p class="help">CSVは筆まめなど他のソフトで使う場合の控えです(UTF-8・Excelで開けます)。</p>
+    </section>
+  </aside>
+  <main class="preview" id="pane"><div class="pages" id="pages"></div></main>
+</div>
+<script>
+/* ============ 設定 ============ */
+const DEF={cols:3,rows:8,w:66,h:33.9,top:12.9,left:6,gapX:0,gapY:0,offX:0,offY:0,font:9,corpHon:'御中'};
+let C=Object.assign({},DEF);
+try{Object.assign(C,JSON.parse(localStorage.getItem('smileclub-label-cfg')||'{}'))}catch(e){}
+const saveCfg=()=>{try{localStorage.setItem('smileclub-label-cfg',JSON.stringify(C))}catch(e){}};
+let files=[],recs=[],testMode=false,startPos=0;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const z2h=s=>String(s??'').replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[－ー―‐−–—]/g,'-');
+
+/* ============ 読み込み ============ */
+function parseCSV(text){
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===','){row.push(f);f=''}
+    else if(c==='\n'){row.push(f);rows.push(row);row=[];f=''}
+    else if(c!=='\r')f+=c}
+  if(f||row.length){row.push(f);rows.push(row)}
+  return rows;
+}
+function decode(buf){try{return new TextDecoder('utf-8',{fatal:true}).decode(buf).replace(/^\uFEFF/,'')}catch(e){return new TextDecoder('shift_jis').decode(buf)}}
+async function readFile(file){
+  const buf=await file.arrayBuffer();
+  if(/\.(xlsx|xls)$/i.test(file.name)){
+    if(typeof XLSX==='undefined')throw new Error('Excel読み込み用の部品を読み込めませんでした。CSVで出力して読み込んでください。');
+    const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+  }
+  return parseCSV(decode(buf));
+}
+const KEYS={
+  name:{inc:['顧客名','氏名','お名前','名前','契約者','施主','宛名'],exc:['カナ','かな','フリガナ','ふりがな','会社','担当','営業','作成者']},
+  company:{inc:['会社名','法人名','企業名','団体名'],exc:['カナ','フリガナ']},
+  zip:{inc:['郵便番号','〒','郵便'],exc:[]},
+  pref:{inc:['都道府県'],exc:[]},
+  city:{inc:['市区町村'],exc:['カナ']},
+  addr:{inc:['住所','番地','所在地','町名','丁目'],exc:['メール','mail','カナ','フリガナ','2','２','建物']},
+  building:{inc:['建物','マンション','ビル','部屋','住所2','住所２'],exc:['カナ']}
+};
+const FIELDS={name:'氏名',company:'会社名',zip:'郵便番号',pref:'都道府県',city:'市区町村',addr:'住所(番地まで)',building:'建物名・部屋番号'};
+function detect(rows){
+  let hi=0,best=-1;
+  for(let i=0;i<Math.min(15,rows.length);i++){const sc=rows[i].filter(h=>Object.values(KEYS).some(k=>k.inc.some(w=>String(h).includes(w)))).length;if(sc>best){best=sc;hi=i}}
+  const hd=rows[hi].map(h=>String(h).trim());const map={};const used=new Set();
+  for(const k of ['zip','pref','city','building','company','name','addr']){
+    const i=hd.findIndex((h,j)=>!used.has(j)&&h&&KEYS[k].inc.some(w=>h.includes(w))&&!KEYS[k].exc.some(w=>h.includes(w)));
+    map[k]=i;if(i>=0)used.add(i);
+  }
+  return{hi,hd,map};
+}
+async function addFiles(list){
+  for(const file of list){
+    try{const rows=(await readFile(file)).filter(r=>r.some(c=>String(c).trim()));if(!rows.length)throw new Error('データがありません。');
+      const d=detect(rows);files.push({name:file.name,rows,...d})}
+    catch(e){alert(`${file.name} を読み込めませんでした。\n${e.message||''}`)}
+  }
+  build();
+}
+
+/* ============ 宛先データ作成 ============ */
+function fmtZip(z){const d=z2h(z).replace(/\D/g,'');return d.length===7?d.slice(0,3)+'-'+d.slice(3):z2h(z).trim()}
+function build(){
+  const prevOff=new Set(recs.filter(r=>!r.on&&!r.dup).map(r=>r.key));
+  recs=[];
+  files.forEach((f,fi)=>{
+    const g=(r,k)=>f.map[k]>=0?String(r[f.map[k]]??'').trim():'';
+    f.rows.slice(f.hi+1).forEach((r,ri)=>{
+      const name=g(r,'name').replace(/\s+/g,' '),company=g(r,'company'),zip=fmtZip(g(r,'zip'));
+      let pref=g(r,'pref'),city=g(r,'city'),addr=g(r,'addr');
+      if(pref&&addr.startsWith(pref))pref='';
+      if(city&&addr.startsWith(city))city='';
+      if(pref&&city&&city.startsWith(pref))pref='';
+      const a1=(pref+city+addr).trim(),a2=g(r,'building');
+      if(!name&&!company&&!a1)return;
+      const issues=[];
+      if(!/^\d{3}-\d{4}$/.test(zip))issues.push(zip?'郵便番号の形':'郵便番号なし');
+      if(!a1)issues.push('住所なし');
+      if(!name&&!company)issues.push('氏名なし');
+      const norm=s=>z2h(s).replace(/[\s　]/g,'').replace(/丁目|番地|番|号/g,'-').replace(/-+/g,'-').replace(/-$/,'');
+      const key=zip.replace(/\D/g,'')+'|'+norm(a1+a2)+'|'+norm(name||company);
+      recs.push({fi,ri,file:f.name,name,company,zip,a1,a2,issues,key,dup:false,on:!issues.length});
+    });
+  });
+  const seen=new Set();
+  recs.forEach(r=>{if(seen.has(r.key)){r.dup=true;r.on=false}else seen.add(r.key);if(prevOff.has(r.key)&&!r.dup)r.on=false});
+  renderFiles();renderTable();renderPages();
+}
+function honor(r){
+  if(r.name)return{co:r.company,nm:/様$|御中$/.test(r.name)?r.name:r.name+' 様'};
+  return{co:'',nm:/様$|御中$/.test(r.company)?r.company:r.company+' '+C.corpHon};
+}
+
+/* ============ 画面 ============ */
+function renderFiles(){
+  $('#files').innerHTML=files.map((f,i)=>`<div class="file"><div class="hd"><b>${esc(f.name)}</b><span class="help" style="margin:0">${f.rows.length-f.hi-1}行</span><button class="btn sm" data-act="rmFile" data-i="${i}">外す</button></div>
+    <details ${Object.entries(f.map).some(([k,v])=>(k==='name'||k==='zip'||k==='addr')&&v<0)?'open':''}><summary class="help" style="cursor:pointer;margin-top:6px">列の対応を確認・変更(見出し行:${f.hi+1}行目)</summary>
+    <div class="maps">${Object.entries(FIELDS).map(([k,l])=>`<label class="f"><span>${l}</span><select data-map="${k}" data-i="${i}"><option value="-1">(使わない)</option>${f.hd.map((h,j)=>`<option value="${j}" ${f.map[k]===j?'selected':''}>${esc(h||'(列'+(j+1)+')')}</option>`).join('')}</select></label>`).join('')}</div>
+    <label class="f" style="margin-top:6px"><span>見出し行</span><select data-hrow="${i}">${f.rows.slice(0,15).map((r,j)=>`<option value="${j}" ${j===f.hi?'selected':''}>${j+1}行目:${esc(r.slice(0,4).join(' / ').slice(0,40))}</option>`).join('')}</select></label></details></div>`).join('');
+}
+function renderTable(){
+  const on=recs.filter(r=>r.on).length,per=C.cols*C.rows;
+  const sheets=on?Math.ceil((on+startPos)/per):0;
+  $('#sum').innerHTML=`<div><b>${on}</b><span>印刷する宛先(ゆうメール通数)</span></div><div><b>${sheets}</b><span>使うシート枚数</span></div><div><b>${recs.filter(r=>r.dup).length}</b><span>重複を除外</span></div>`;
+  if(!recs.length){$('#tbl').innerHTML='<p class="help" style="padding:10px">名簿を読み込むと、ここに一覧が表示されます。</p>';return}
+  const fl=$('#filterSel').value;
+  const list=order().filter(r=>fl==='all'||(fl==='issue'&&(r.issues.length||r.dup))||(fl==='off'&&!r.on));
+  $('#tbl').innerHTML=`<table><thead><tr><th></th><th>宛名</th><th>住所</th></tr></thead><tbody>${list.map(r=>{const h=honor(r);return`<tr class="${r.on?'':'off'}"><td><input type="checkbox" data-rec="${recs.indexOf(r)}" ${r.on?'checked':''}></td><td>${h.co?esc(h.co)+'<br>':''}${esc(h.nm)}${r.issues.map(x=>`<br><span class="tag">${x}</span>`).join('')}${r.dup?'<br><span class="tag dup">重複</span>':''}</td><td>〒${esc(r.zip)}<br>${esc(r.a1)} ${esc(r.a2)}</td></tr>`}).join('')}</tbody></table>`;
+}
+function order(){const l=recs.slice();if($('#sortSel').value==='zip')l.sort((a,b)=>a.zip.replace(/\D/g,'').localeCompare(b.zip.replace(/\D/g,'')));return l}
+function labelPos(i){const c=i%C.cols,r=Math.floor(i/C.cols)%C.rows;return{x:C.left+C.offX+c*(C.w+C.gapX),y:C.top+C.offY+r*(C.h+C.gapY)}}
+function labelHtml(i,inner,no){const p=labelPos(i);return`<div class="lb" style="left:${p.x}mm;top:${p.y}mm;width:${C.w}mm;height:${C.h}mm;font-size:${C.font}pt">${inner}${no?`<span class="no">${no}</span>`:''}</div>`}
+function renderPages(){
+  const per=C.cols*C.rows;let sheets=[];
+  if(testMode){
+    sheets=[[...Array(per).keys()].map(i=>labelHtml(i,`<div class="zp">〒371-0000</div><div class="ad">群馬県利根郡川場村谷地1950 テスト ${Math.floor(i/C.cols)+1}行${i%C.cols+1}列</div><div class="nm">関 太郎 様</div>`))];
+  }else{
+    const list=order().filter(r=>r.on);
+    list.forEach((r,k)=>{const pos=k+startPos,si=Math.floor(pos/per);(sheets[si]=sheets[si]||[]);const h=honor(r);
+      sheets[si].push(labelHtml(pos%per,`<div class="zp">〒${esc(r.zip)}</div><div class="ad">${esc(r.a1)}${r.a2?'<br>'+esc(r.a2):''}</div>${h.co?`<div class="co">${esc(h.co)}</div>`:''}<div class="nm">${esc(h.nm)}</div>`,k+1))});
+  }
+  const pane=$('#pane'),w=pane.clientWidth;
+  const s=Math.min(.8,w>1150?(w-90)/(2*794):(w-60)/794);
+  if(!sheets.length){$('#pages').innerHTML='<div class="empty">名簿を読み込むと、ここにラベルの仕上がりが表示されます。<br>先に「位置合わせ用テスト印刷」でシールの位置を確認しておくと安心です。</div>';return}
+  $('#pages').innerHTML=sheets.map((l,i)=>`<div class="pv" style="width:${794*s}px;height:${1123*s}px"><span class="lbl">${testMode?'位置合わせ用(普通紙に印刷)':(i+1)+'枚目'}</span><div class="sheet ${testMode?'frame':''}" style="transform:scale(${s})">${(l||[]).join('')}</div></div>`).join('');
+  fit();
+}
+/* 長い住所・氏名は、そのラベルだけ文字を小さくして収める */
+function fit(){
+  document.querySelectorAll('.lb').forEach(el=>{let fs=C.font;const nm=el.querySelector('.nm'),co=el.querySelector('.co');
+    const over=()=>el.scrollHeight>el.clientHeight+1||(nm&&nm.scrollWidth>nm.clientWidth+1)||(co&&co.scrollWidth>co.clientWidth+1);
+    while(over()&&fs>5.5){fs-=.25;el.style.fontSize=fs+'pt'}});
+}
+function renderStart(){const per=C.cols*C.rows;$('#startSel').innerHTML=[...Array(per).keys()].map(i=>`<option value="${i}" ${i===startPos?'selected':''}>${i===0?'1枚目の先頭から':`${Math.floor(i/C.cols)+1}行目・${i%C.cols+1}列目から(${i}面使用済み)`}</option>`).join('')}
+function renderCfg(){document.querySelectorAll('[data-cfg]').forEach(el=>el.value=C[el.dataset.cfg])}
+
+/* ============ イベント ============ */
+const drop=$('#drop');
+drop.onclick=()=>$('#fileIn').click();
+$('#fileIn').onchange=e=>{addFiles([...e.target.files]);e.target.value=''};
+['dragover','dragenter'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add('on')}));
+['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('on')}));
+drop.addEventListener('drop',e=>addFiles([...e.dataTransfer.files]));
+$('#editor').addEventListener('change',e=>{const t=e.target;
+  if(t.dataset.map){files[+t.dataset.i].map[t.dataset.map]=+t.value;build();return}
+  if(t.dataset.hrow){const f=files[+t.dataset.hrow];f.hi=+t.value;f.hd=f.rows[f.hi].map(h=>String(h).trim());Object.assign(f,detectAt(f));build();return}
+  if(t.dataset.rec){recs[+t.dataset.rec].on=t.checked;renderTable();renderPages();return}
+  if(t.id==='sortSel'||t.id==='filterSel'){renderTable();renderPages();return}
+  if(t.id==='startSel'){startPos=+t.value;renderTable();renderPages();return}
+  if(t.dataset.cfg){C[t.dataset.cfg]=t.dataset.cfg==='corpHon'?t.value:(parseFloat(t.value)||0);saveCfg();renderStart();renderTable();renderPages()}
+});
+function detectAt(f){const tmp=[f.rows[f.hi]];const d=detect(tmp);return{map:d.map}}
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;
+  switch(el.dataset.act){
+    case 'rmFile':files.splice(+el.dataset.i,1);build();break;
+    case 'resetCfg':C=Object.assign({},DEF);saveCfg();renderCfg();renderStart();renderPages();break;
+    case 'testPrint':testMode=true;renderPages();setTimeout(()=>{window.print()},250);break;
+    case 'print':if(!recs.some(r=>r.on)){alert('印刷する宛先がありません。名簿を読み込んでください。');return}testMode=false;renderPages();setTimeout(()=>window.print(),250);break;
+    case 'csv':{const l=order().filter(r=>r.on);if(!l.length){alert('保存する宛先がありません。');return}
+      const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+      const csv='\uFEFF'+[['郵便番号','住所1','住所2','会社名','氏名'].map(q).join(',')].concat(l.map(r=>[r.zip,r.a1,r.a2,r.company,r.name].map(q).join(','))).join('\r\n');
+      const u=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const a=document.createElement('a');a.href=u;a.download='宛名リスト.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);break}
+  }});
+window.addEventListener('afterprint',()=>{if(testMode){testMode=false;renderPages()}});
+window.addEventListener('beforeprint',()=>document.querySelectorAll('.sheet').forEach(s=>s.style.transform='none'));
+window.addEventListener('afterprint',()=>renderPages());
+window.addEventListener('resize',()=>renderPages());
+renderCfg();renderStart();renderTable();renderPages();
+</script>
+</body>
+</html>

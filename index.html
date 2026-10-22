@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>すまいるくらぶ作成ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Noto+Serif+JP:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style id="pageSize">@page{size:A4;margin:0}</style>
+<style>
+:root{--bg:#f3eee5;--panel:#fbf8f2;--ink:#232323;--wood:#AD8A5C;--line:#e1d6c4;--muted:#6b6256;--field:#ffffff;--warn:#b3261e;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1a17;--panel:#26231f;--ink:#ece6dc;--wood:#c9a678;--line:#3b352d;--muted:#a59c8f;--field:#1f1d1a;--warn:#f2857c;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Yu Gothic","游ゴシック",YuGothic,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:14px}
+button,input,select,textarea{font:inherit;color:inherit}
+.top{height:56px;display:flex;align-items:center;gap:12px;padding:0 20px;background:#232323;color:#f3eee5}
+.top h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.04em}
+.top .sp{flex:1}.top .st{font-size:12px;opacity:.75}
+.btn{border:1px solid var(--wood);background:transparent;color:inherit;padding:7px 14px;border-radius:4px;cursor:pointer}
+.btn:hover{background:rgba(173,138,92,.15)}
+.btn.pri{background:var(--wood);color:#fff}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--wood);outline-offset:1px}
+.app{display:grid;grid-template-columns:440px 1fr;height:calc(100% - 56px)}
+.editor{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:8px 18px 60px}
+.sec{border-bottom:1px solid var(--line);padding:16px 0}
+.sec h2{display:flex;align-items:baseline;gap:10px;font-size:15px;margin:0 0 12px}
+.sec h2 .n{font-size:22px;color:var(--wood);font-weight:700;font-family:Georgia,serif}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.f{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;flex:1;min-width:0}
+.f>span{font-size:12px;color:var(--muted)}
+input[type=text],input[type=number],input[type=url],select,textarea{background:var(--field);border:1px solid var(--line);border-radius:4px;padding:6px 8px;width:100%}
+textarea{resize:vertical;min-height:56px;line-height:1.5}
+input[type=range]{flex:1}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px}
+.tabs{display:flex;gap:4px;margin-bottom:12px}
+.tab{flex:1;padding:8px;border:1px solid var(--line);background:transparent;border-radius:4px;cursor:pointer}
+.tab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tab .w{color:var(--warn);font-size:12px;margin-left:4px}.tab.on .w{color:#ffb4ab}
+.card{border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--field)}
+.card.on{border-color:var(--wood)}
+.ch{display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer}
+.ch .ty{font-size:11px;background:var(--wood);color:#fff;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.ch .ti{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.ch .sz{font-size:11px;color:var(--muted);white-space:nowrap}
+.cb{padding:4px 10px 10px;border-top:1px dashed var(--line)}
+.ops{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0}
+.grp{border-left:3px solid var(--line);padding-left:8px;margin:10px 0}
+.grp>b{font-size:12px;display:block;margin-bottom:6px;color:var(--muted)}
+.phin{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.phin .th{width:56px;height:42px;border:1px solid var(--line);border-radius:3px;background:var(--bg) center/cover no-repeat;flex:none}
+.help{font-size:12px;color:var(--muted);line-height:1.6;margin:4px 0 8px}
+.add{display:flex;gap:6px;margin-top:10px}
+.preview{overflow:auto;padding:28px 24px;position:relative}
+.pages{display:flex;flex-wrap:wrap;gap:30px;justify-content:center;align-items:flex-start}
+.pv{position:relative;flex:none}
+.pv .lbl{position:absolute;top:-20px;left:0;font-size:12px;color:var(--muted)}
+.pv .ov{position:absolute;top:-22px;right:0;font-size:12px;color:#fff;background:var(--warn);padding:1px 8px;border-radius:3px;display:none}
+.pv.over .ov{display:block}
+.pv .sheet{transform-origin:top left;box-shadow:0 2px 14px rgba(0,0,0,.18)}
+
+/* ===== 紙面 ===== */
+.sheet{width:210mm;height:297mm;background:var(--paper,#fff);color:#1d1d1d;padding:7mm;display:flex;flex-direction:column;gap:2.5mm;font-family:"Noto Sans JP","Yu Gothic",sans-serif;font-size:8.5pt;line-height:1.55;overflow:hidden}
+.flow{flex:1;min-height:0;display:flex;flex-direction:column;gap:2.5mm;overflow:hidden}
+.rw{display:grid;grid-template-columns:1fr;gap:2.5mm;min-height:0;flex:none}
+.rw.two{grid-template-columns:1fr 1fr}
+.rw.fill{flex:1 1 0}
+.blk{position:relative;overflow:hidden;display:flex;flex-direction:column;min-width:0;min-height:0;cursor:pointer;height:100%}
+.blk.fr-square{border:.35mm solid #333;padding:2.5mm;background:var(--card,#fff)}
+.blk.fr-round{border:.35mm solid #333;border-radius:3.5mm;padding:3mm;background:var(--card,#fff)}
+.blk.fs-s{font-size:7.5pt}.blk.fs-m{font-size:8.5pt}.blk.fs-l{font-size:10pt}
+.blk:hover{outline:1.5px dashed #AD8A5C;outline-offset:1px}
+.txt{white-space:pre-wrap}
+.ph{width:100%;height:100%;object-fit:cover;display:block;min-height:0}
+.ph-empty{background:#e9e6e1;color:#9a948b;display:flex;align-items:center;justify-content:center;font-size:9pt}
+.qr{width:16mm;height:16mm;display:block;image-rendering:pixelated}
+.qrbox{display:flex;flex-direction:column;align-items:center;font-size:6.5pt;gap:.5mm;flex:none;text-align:center;line-height:1.3}
+.wk-sat{color:#1f5fbf}.wk-sun{color:#d0202e}
+.wk{font-size:.55em}
+.serif{font-family:"Noto Serif JP","Yu Mincho",serif}
+
+/* ヘッダー */
+.mast{background:var(--head,transparent);margin:-7mm -7mm 0;padding:7mm 7mm 2.5mm;display:grid;grid-template-columns:auto 1fr auto;gap:5mm;align-items:start;padding-bottom:1mm}
+.yu{width:20mm;text-align:center;font-size:7.5pt}
+.yu .bx{border:.35mm solid #222;height:13mm;display:flex;align-items:flex-start;justify-content:center;margin-bottom:1mm;font-size:8pt;padding-top:1mm}
+.ttl{text-align:center}
+.ttl .sc{font-family:"Noto Serif JP",Georgia,serif;font-weight:700;font-size:25pt;line-height:1.1;letter-spacing:.01em}
+.ttl .no{font-size:7.5pt;letter-spacing:.06em;margin-top:.5mm}
+.sns{display:flex;justify-content:center;gap:4mm;margin-top:1.5mm}
+.sns .qrbox{flex-direction:row;gap:1mm;font-weight:700}
+.sns .qr{width:11mm;height:11mm}
+.co{font-size:6.8pt;line-height:1.45;max-width:72mm}
+.co .logo{max-height:15mm;max-width:70mm;display:block;margin-bottom:1.5mm}
+.co .lt{font-weight:900;font-size:13pt;line-height:1.02;margin-bottom:1.5mm;white-space:pre-line}
+
+/* 見学会:写真に文字を重ねる */
+.hero{position:relative;flex:1;min-height:0;overflow:hidden;background:#dfe6ee}
+.hero>.ph{position:absolute;inset:0}
+.hero .shade{position:absolute;inset:0 0 auto 0;height:62%;background:linear-gradient(rgba(255,255,255,.88),rgba(255,255,255,.55) 60%,rgba(255,255,255,0))}
+.hero.lt .shade{background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.25) 60%,rgba(0,0,0,0))}
+.hero .hc{position:absolute;inset:4mm 5mm auto 5mm;display:grid;grid-template-columns:auto 1fr;gap:3mm 7mm;align-items:start}
+.hero.lt .hc{color:#fff}
+.hero .kind{font-size:.95em;font-weight:700}
+.hero .lab{font-weight:900;font-size:24pt;line-height:1;letter-spacing:-.01em;margin:.5mm 0}
+.hero .dt{font-weight:900;font-size:30pt;line-height:1.05;letter-spacing:-.01em}
+.hero .tt{font-family:"Noto Serif JP",serif;font-weight:700;font-size:15pt;line-height:1.35;white-space:pre-wrap}
+.hero .inf{white-space:pre-wrap;margin-top:1.5mm;font-size:.95em;font-weight:500}
+.hero .hb{position:absolute;left:3mm;right:3mm;bottom:3mm;display:flex;gap:3mm;align-items:flex-end}
+.hero .bd{flex:1;background:rgba(255,255,255,.88);border-radius:2mm;padding:2mm 3mm;white-space:pre-wrap;font-size:.9em}
+.hero .bd:empty{visibility:hidden}
+.hero .hb .qrbox{background:#fff;padding:1.5mm;border-radius:1.5mm}
+/* 見学会:標準 */
+.ohs-top{display:flex;align-items:flex-end;justify-content:space-between;gap:3mm}
+.ohs-top .lab{font-weight:900;font-size:20pt;line-height:1}
+.ohs-top .dt{font-weight:900;font-size:20pt;line-height:1}
+.ohs-tt{font-family:"Noto Serif JP",serif;font-weight:700;font-size:1.3em;margin:1.5mm 0;white-space:pre-wrap}
+.ohs-main{flex:1;min-height:0;display:grid;grid-template-columns:1.7fr 1fr;gap:3mm}
+.half .ohs-main{grid-template-columns:1fr;grid-template-rows:1fr auto}
+
+/* 記事・イベント共通 */
+.c-bar{color:#fff;font-weight:900;font-size:1.4em;padding:1.5mm 3mm;line-height:1.3;white-space:pre-wrap;text-align:center;flex:none}
+.c-line{font-weight:900;font-size:1.3em;line-height:1.35;border-bottom:.6mm solid;padding-bottom:1mm;white-space:pre-wrap;flex:none}
+.c-center{font-family:"Noto Serif JP",serif;font-weight:700;font-size:1.3em;line-height:1.45;text-align:center;white-space:pre-wrap;flex:none}
+.c-sub{font-family:"Noto Serif JP",serif;font-weight:700;font-size:1.3em;text-align:center;margin-top:1mm;white-space:pre-wrap;flex:none}
+.c-date{font-weight:900;font-size:1.5em;text-align:center;margin-top:1mm;flex:none}
+.c-main{flex:1;min-height:0;display:grid;gap:2.5mm;margin-top:2mm}
+.c-main.pl-right{grid-template-columns:1fr 1fr}
+.c-main.pl-left{grid-template-columns:1fr 1fr}
+.c-main.pl-left .phs{order:-1}
+.c-main.pl-top{grid-template-rows:1fr auto}
+.c-main.pl-bottom{grid-template-rows:auto 1fr}
+.c-main.pl-bottom .phs{order:2}
+.c-main.np{grid-template-columns:1fr;grid-template-rows:1fr}
+.half .c-main.pl-right,.half .c-main.pl-left{grid-template-columns:1fr;grid-template-rows:1fr auto}
+.half .c-main.pl-right .phs,.half .c-main.pl-left .phs{order:-1}
+.c-tx{display:flex;gap:3mm;align-items:flex-end;min-height:0;overflow:hidden}
+.c-tx>.tc{flex:1;min-width:0;display:flex;flex-direction:column;gap:1.5mm}
+.info{border-top:.3mm solid;padding-top:1.5mm;white-space:pre-wrap;font-size:.95em}
+.info>span{color:#1d1d1d}
+.phs{display:grid;gap:1.5mm;min-height:0}
+.phs.n2{grid-template-columns:1fr 1fr}
+.phs.n3{grid-template-columns:1fr 1fr;grid-template-rows:1.4fr 1fr}
+.phs.n3>:first-child{grid-column:1/-1}
+.phs.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.c-main.pl-top .phs.v2,.c-main.pl-bottom .phs.v2{grid-template-columns:1fr;grid-template-rows:1fr 1fr}
+/* 帯 */
+.bn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:2mm 4mm}
+.bn .t{font-weight:900;font-size:15pt;line-height:1.3;white-space:pre-wrap}
+.bn .s{font-size:9pt;white-space:pre-wrap;margin-top:1mm}
+/* モデルハウス */
+.mh{flex:1;min-height:0;display:flex;flex-direction:column;gap:2mm}
+.mh.bb{flex-direction:column-reverse}
+.mh-bar{display:flex;align-items:center;gap:5mm;color:#fff;padding:2mm 5mm;flex:none}
+.mh-bar .tc{flex:1;text-align:center}
+.mh-bar .t{font-family:"Noto Serif JP",serif;font-weight:700;font-size:13pt;line-height:1.3}
+.mh-bar .s{font-size:8pt}
+.mh-bar .tel{font-weight:900;font-size:14pt;margin-left:3mm}
+.mh-bar .qrbox{flex-direction:row;gap:2mm;font-size:7pt}
+.mh-bar .qr{background:#fff;padding:.8mm;width:14mm;height:14mm}
+.mh-cols{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);gap:1.5mm}
+.half .mh-cols{grid-template-columns:1fr}
+.mh-cols{grid-template-rows:minmax(0,1fr) auto auto auto}
+.mh-c{display:grid;grid-row:span 4;grid-template-rows:subgrid;min-height:0}
+.mh-c .phw{min-height:0}
+.half .mh-cols{grid-template-rows:none;grid-auto-rows:auto}
+.half .mh-c{display:flex;flex-direction:column;grid-row:auto}
+.half .mh-c .phw{flex:1}
+.mh-c .d{font-size:.88em;text-align:center;margin-top:1mm;line-height:1.35;white-space:pre;font-weight:700;align-self:end;overflow:hidden}
+.mh-c .nm{font-size:.88em;text-align:center;line-height:1.35;white-space:pre;font-weight:700;overflow:hidden}
+.mh-c .a{font-size:.82em;margin-top:.8mm;white-space:pre;padding-left:2mm;overflow:hidden}
+/* 建設中 */
+.cs-bar{color:#fff;display:flex;align-items:baseline;gap:4mm;padding:1.5mm 4mm;flex:none}
+.cs-bar .t{font-weight:700;font-size:11pt}
+.cs-bar .n{font-size:6.3pt;margin-left:auto}
+.cs-main{flex:1;min-height:0;display:grid;grid-template-columns:1.3fr 1fr;gap:2.5mm;margin-top:1.5mm}
+.half .cs-main{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+.cs-main.np{grid-template-columns:1fr}
+.cs-l{min-height:0;overflow:hidden}
+.cs-tb{border-collapse:collapse;width:100%;font-size:.86em}
+.cs-tb th{text-align:justify;text-align-last:justify;white-space:nowrap;vertical-align:top;padding:1mm 3mm 1mm 0;font-weight:500;width:1%}
+.cs-tb td{padding:1mm 0;border-bottom:.2mm dashed #999;line-height:1.5}
+.cs-tb tr:last-child td{border-bottom:0}
+.cs-i{display:inline-block;margin-right:2.5mm}
+.cs-ph{position:relative;min-height:0}
+.cs-ph .cap{position:absolute;left:0;top:0;background:rgba(255,255,255,.85);font-size:6.5pt;padding:.3mm 1.5mm}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal[hidden]{display:none}
+.mbox{background:var(--panel);color:var(--ink);border-radius:8px;padding:20px;width:min(460px,92vw);max-height:80vh;overflow:auto}
+.mbox h3{margin:0 0 12px;font-size:16px}
+.ilist{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.ilist button{text-align:left;padding:10px 12px;border:1px solid var(--line);background:var(--field);border-radius:6px;cursor:pointer}
+.ilist button:hover{border-color:var(--wood)}
+.ilist small{color:var(--muted);margin-left:8px}
+.top .sh{font-size:12px;padding:3px 8px;border-radius:3px;background:rgba(255,255,255,.12)}
+.top .sh.dirty{background:#b3261e;color:#fff}
+@media (max-width:900px){.app{grid-template-columns:1fr;height:auto}.editor{border-right:0;border-bottom:1px solid var(--line)}}
+@media print{
+  html,body{background:#fff;height:auto}
+  .top,.editor,.pv .lbl,.pv .ov{display:none!important}
+  .app{display:block;height:auto}.preview{padding:0;overflow:visible}.pages{display:block}
+  .pv{width:auto!important;height:auto!important;break-after:page;page-break-after:always}
+  .pv:last-child{break-after:auto;page-break-after:auto}
+  .pv .sheet{transform:none!important;box-shadow:none}
+  body.bleed .pv{padding:3mm;background:var(--paper,#fff)}
+  .blk:hover{outline:none}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>すまいるくらぶ作成ツール</h1>
+  <span class="st" id="saveSt"></span>
+  <span class="sp"></span>
+  <span class="sh" id="shareSt" hidden></span>
+  <button class="btn" data-act="openShared">共有から開く</button>
+  <button class="btn" data-act="pushShared">共有に保存</button>
+  <a class="btn" href="label.html" style="text-decoration:none">宛名ラベル</a>
+  <button class="btn" data-act="nextIssue">次の号を作成</button>
+  <button class="btn pri" data-act="print">印刷・PDF保存</button>
+</header>
+<div class="app">
+  <aside class="editor" id="editor"></aside>
+  <main class="preview" id="previewPane"><div class="pages" id="pages"></div></main>
+</div>
+<div class="modal" id="modal" hidden><div class="mbox"><h3>共有から開く</h3><div class="ilist" id="ilist"></div><button class="btn" data-act="mclose">閉じる</button></div></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script>
+/* ============ 定数 ============ */
+const MONTHS=[1,3,5,7,9];
+const TYPES={openhouse:'見学会',article:'記事',event:'イベント',banner:'帯・見出し',modelhouse:'モデルハウス',construction:'建設中一覧'};
+const COLORS={black:['黒','#232323'],navy:['紺','#1f3a68'],red:['赤','#c62d3a'],green:['緑','#2f7a52'],wood:['木','#8a5a2b'],sky:['水色','#2d86b0'],pink:['ピンク','#d0567a'],orange:['オレンジ','#e07a1f']};
+const POS={top:'上',center:'中央',bottom:'下'};
+const FRAMES={none:'なし',square:'四角',round:'角丸'};
+const THEMES={standard:['白(標準)','#ffffff','#ffffff','#ffffff'],sora:['空色','#eef5fb','#cfe3f3','#ffffff'],kinari:['生成り','#f7f1e6','#ece0c8','#fffdf8'],wakaba:['若草','#f1f6ec','#d9e9cc','#ffffff'],sakura:['桜','#fbf0f2','#f3d6dd','#ffffff'],aki:['秋色','#f8efe6','#e8cdb2','#fffaf5'],yuki:['冬・グレー','#f1f2f4','#dadde3','#ffffff']};
+const defTheme=()=>({preset:'standard',paper:'#ffffff',head:'#ffffff',card:'#ffffff'});
+/* 号数:2026年9月号(No.281)までは月ごとに+1、それ以降は発行ごとに+1(1・3・5・7・9月) */
+const issueIdx=(y,m)=>(+y)*5+MONTHS.indexOf(+m);
+const calcNo=(y,m)=>{if(+y<2026||(+y===2026&&+m<=9))return 275+(+y-2026)*12+(+m-3);const i=MONTHS.indexOf(+m);return i<0?'':281+issueIdx(y,m)-issueIdx(2026,9)};
+const uid=()=>'b'+Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+/* ============ ブロック雛形 ============ */
+const DEF={
+  openhouse:{style:'hero',tone:'dark',color:'black',fill:true,kind:'長期優良住宅 完成見学会',date:'9/12(土)・13(日)',title:'「タイトルを入力」',
+    info:'時間 AM10:00〜PM4:00\n場所 \n工法 \n☎予約:027-386-3432',body:'',qr:'',qrcap:'WEB予約\nQRコード',photos:[null]},
+  article:{frame:'round',ts:'center',pl:'top',title:'記事の見出し',sub:'',date:'',body:'',info:'',qr:'',qrcap:'',n:1,photos:[null,null,null]},
+  event:{frame:'round',ts:'bar',pl:'right',color:'navy',title:'イベント名',sub:'',date:'○月○日(○)',body:'イベントの説明文',info:'会場:\nお問い合わせ:0278-52-2239',qr:'',qrcap:'お申込みフォーム',n:2,photos:[null,null,null]},
+  banner:{color:'green',h:20,title:'見出しテキスト',sub:''},
+  modelhouse:{color:'black',h:88,bar:'top',title:'3棟モデルハウス公開中！完全予約制',sub:'10:00〜17:00(水曜日定休)',tel:'027-386-3432',qr:'',qrcap:'モデルハウス\n予約ページ',models:[
+    {desc:'高崎市に体感型新モデルハウス\nモデルハウス【Relaxras】',addr:'所在地:群馬県高崎市新保町70-3\n構 造:SE構法 2階建て',photo:null},
+    {desc:'日常と非日常をあいまいにする\nモデルハウス【ソトウチ】',addr:'所在地:群馬県利根郡川場村谷地1950\n構 造:在来工法 平屋建て',photo:null},
+    {desc:'木の温もりに触れさわやかな緑の中で暮らす家\nリノベーションモデルハウス【Reno】',addr:'所在地:群馬県高崎市東貝沢町3-1-9\n構 造:SE構法 2階建て',photo:null}]},
+  construction:{color:'black',h:82,title:'◆現在建設中の建物です◆',note:'引き渡し済みの建物以外はいつでもご覧いただけますのでお気軽にご連絡下さい',n:4,
+    stages:[{name:'完成',list:''},{name:'仕上工事',list:''},{name:'造作工事',list:''},{name:'基礎工事',list:''},{name:'準備工事',list:''}],
+    photos:[{img:null,cap:''},{img:null,cap:''},{img:null,cap:''},{img:null,cap:''}]}
+};
+const PRESETS={
+  youtube:['article','YouTubeルームツアー',{title:'関工務所公式YouTubeに\n新しいルームツアーが追加されています',sub:'「動画タイトル」',body:'ルームツアー動画確認\n\nもしくは【関工務所 YouTube】で検索',n:1}],
+  works:['article','施工例追加',{title:'関工務所 施工例追加',sub:'「施工例タイトル」',body:'',qrcap:'施工作品',n:2}],
+  award:['article','受賞・メディア掲載',{ts:'line',pl:'right',frame:'none',title:'見出し',body:'本文',n:1}],
+  workshop:['event','木工教室',{ts:'bar',color:'black',pl:'top',title:'○月○日(日) 木工教室開催',date:'',body:'関工務所の大工がしっかりサポート♪\nキット作成からオリジナル作品も作れます',info:'日程:\n会場:関工務所本社(川場村谷地1950)\n時間:10時〜12時、13時〜15時\n電話:0278-52-2239',qrcap:'お申込みフォーム',n:4}]
+};
+function mk(type,o={}){
+  const base={id:uid(),type,full:true,fill:false,h:60,color:'black',fs:'auto',frame:'none',pos:'center',open:false};
+  return Object.assign(base,clone(DEF[type]),clone(o));
+}
+function migrate(b){
+  if(b.type==='modelhouse'&&b.models)b.models.forEach(m=>{if(m.desc==='リノベーションモデルハウス\n木の温もりに触れさわやかな緑の中で暮らす家\nモデルハウス【Reno】')m.desc='木の温もりに触れさわやかな緑の中で暮らす家\nリノベーションモデルハウス【Reno】'});
+  if(b.frame===true)b.frame='square';if(b.frame===false)b.frame='none';
+  const d=mk(b.type);delete d.id;
+  for(const k in d)if(b[k]===undefined)b[k]=d[k];
+  return b;
+}
+
+function sampleState(){
+  const cs=mk('construction');
+  cs.stages[0].list='H.K様邸 吉岡町\nI.H様邸 川場村\nT.Y様邸 川場村';
+  cs.stages[1].list='H様邸 渋川市\nK.S様邸 渋川市\nI.T様邸 みなかみ町\nM様邸 みなかみ町';
+  cs.stages[2].list='N.T様邸 川場村\nT.N様邸 甘楽町\nK様事務所 高崎市\nY.R様邸 伊勢崎市\nO.S様邸 前橋市';
+  cs.stages[3].list='T.S様邸 高崎市\nF.T様邸 安中市\nN.T様邸 前橋市\nM.A様邸 前橋市';
+  cs.stages[4].list='K.T様邸 みなかみ町\nY様邸 本庄早稲田\nK.R様邸 前橋市\nM.A様邸 伊勢崎市\nT.N様邸 沼田市\nK.S様邸 沼田市';
+  ['A様邸(渋川市)','I様邸(前橋市)','I様邸(太田市)','H様邸(高崎市)'].forEach((c,i)=>cs.photos[i].cap=c);
+  return {v:2,
+    meta:{year:2026,month:9,no:281,noAuto:true,order:'gf',bleed:false},
+    theme:defTheme(),
+    header:{yu:true,title:'Smile club',qrHome:'',qrInsta:'',qrLine:'',logo:null,logoText:'SEKI\nDESIGN\nARCHITECT',
+      company:'株式会社 関工務所\n群馬県利根郡川場村谷地1950 / ☎0278-52-2239\n群馬県高崎市新保町271-1 / ☎027-386-3432'},
+    pages:[[
+      mk('openhouse',{kind:'長期優良住宅 完成見学会',date:'9/12(土)・13(日)',title:'「光を招き木と暮らす\n北欧ナチュラルの家」',
+        info:'時間 AM10:00〜PM4:00\n場所 北群馬郡吉岡町 / 工法 在来工法 2階建て\n☎予約:027-386-3432',body:'※完全予約制となります。\n会場の詳細は、ご予約いただいたお客様へ個別にご案内いたします。'}),
+      mk('modelhouse',{bar:'bottom'})
+    ],[
+      mk('article',Object.assign(clone(PRESETS.youtube[2]),{full:false,fill:true,sub:'「コの字型の中庭のある平屋」',n:2})),
+      mk('event',{full:false,fill:true,ts:'center',pl:'top',n:1,title:'9/20、10/3 世田谷区にて\n茅葺き屋根仕上げ体験、見学会開催',date:'',
+        body:'日程:9月20日(日)\n▶茅葺屋根の仕上げ 実演と体験 10時〜12時\n▶棟上げ儀礼の再現 1時30分から1時間程度\n\n日程:10月3日(土)\n▶旧城田家住宅主屋 茅葺き屋根修理工事見学会 11時30分〜13時',
+        info:'会場:世田谷区立次大夫堀公園民家園\n主催:世田谷区教育委員会\n協力:(株)関工務所',qrcap:'詳しくは世田谷デジタル\nミュージアムへ'}),
+      cs
+    ]]};
+}
+
+/* ============ 保存(IndexedDB) ============ */
+const DB={db:null,
+  open(){if(this.db)return Promise.resolve(this.db);return new Promise((res,rej)=>{const r=indexedDB.open('smileclub-tool',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{this.db=r.result;res(r.result)};r.onerror=()=>rej(r.error)})},
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
+};
+let S=null,ui={page:0,over:[]},saveT=null,pvT=null;
+const $=s=>document.querySelector(s);
+function save(dirty=true){if(dirty&&S.remote){S.remote.dirty=true;shareStatus()}clearTimeout(saveT);$('#saveSt').textContent='保存中…';saveT=setTimeout(async()=>{
+  try{await DB.set('current',S);$('#saveSt').textContent='この端末に保存済み'}catch(e){$('#saveSt').textContent='自動保存できませんでした(データ書き出しで保存してください)'}},500)}
+
+/* ============ 共有(GitHubのプライベートリポジトリ) ============ */
+let CFG={repo:'',token:'',name:''};
+async function loadCfg(){try{const c=await DB.get('cfg');if(c)Object.assign(CFG,c)}catch(e){}}
+function saveCfg(){DB.set('cfg',CFG).catch(()=>{})}
+const shareReady=()=>CFG.repo&&CFG.token;
+async function errMsg(r){const m={401:'トークンが正しくないか、期限切れです。',403:'このトークンには書き込み権限がありません。',404:'リポジトリが見つかりません(名前とトークンの対象リポジトリを確認してください)。'};return m[r.status]||`通信エラー(${r.status})`}
+const GH={
+  h(x={}){return Object.assign({'Authorization':'Bearer '+CFG.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},x)},
+  url(p){return `https://api.github.com/repos/${CFG.repo}/contents/${p.split('/').map(encodeURIComponent).join('/')}`},
+  async meta(p){const r=await fetch(this.url(p)+'?t='+Date.now(),{headers:this.h(),cache:'no-store'});if(r.status===404)return null;if(!r.ok)throw new Error(await errMsg(r));return r.json()},
+  async raw(p,blob){const r=await fetch(this.url(p)+'?t='+Date.now(),{headers:this.h({'Accept':'application/vnd.github.raw+json'}),cache:'no-store'});if(!r.ok)throw new Error(await errMsg(r));return blob?r.blob():r.text()},
+  put(p,b64,sha,msg){return fetch(this.url(p),{method:'PUT',headers:this.h({'Content-Type':'application/json'}),body:JSON.stringify(sha?{message:msg,content:b64,sha}:{message:msg,content:b64})})}
+};
+function b64utf8(str){const by=new TextEncoder().encode(str);let bin='';for(let i=0;i<by.length;i+=0x8000)bin+=String.fromCharCode.apply(null,by.subarray(i,i+0x8000));return btoa(bin)}
+function hashStr(str){let h1=0x811c9dc5,h2=0x1b873593;for(let i=0;i<str.length;i++){const c=str.charCodeAt(i);h1=Math.imul(h1^c,16777619);h2=Math.imul(h2^c,2654435761)}return(h1>>>0).toString(16).padStart(8,'0')+(h2>>>0).toString(16).padStart(8,'0')+str.length.toString(16)}
+const issuePath=()=>`issues/${S.meta.year}-${String(S.meta.month).padStart(2,'0')}.json`;
+const issueLabel=path=>{const m=path.match(/(\d{4})-(\d{2})/);return m?`${m[1]}年${+m[2]}月号`:path};
+const fmtDate=iso=>{if(!iso)return'';const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`};
+function shareStatus(){
+  const el=$('#shareSt');if(!el)return;
+  if(!S||!S.remote){el.hidden=true;return}
+  el.hidden=false;el.classList.toggle('dirty',!!S.remote.dirty);
+  el.textContent=S.remote.dirty?`共有:未保存の変更あり(${issueLabel(S.remote.path)})`:`共有:保存済み ${S.remote.savedBy||''} ${fmtDate(S.remote.savedAt)}`;
+}
+/* 写真は images/ に1枚ずつ保存し、号のデータには参照だけを入れる */
+function packState(){
+  const imgs={};const c=clone(S);delete c.remote;c.pages.forEach(p=>p.forEach(b=>delete b.open));
+  const walk=o=>{for(const k in o){const v=o[k];if(typeof v==='string'&&v.startsWith('data:image')){const ext=v.startsWith('data:image/png')?'png':'jpg';const name=hashStr(v)+'.'+ext;imgs[name]=v;o[k]='gh:'+name}else if(v&&typeof v==='object')walk(v)}};
+  walk(c);return{data:c,imgs};
+}
+async function unpackState(d){
+  const refs=[];const walk=o=>{for(const k in o){const v=o[k];if(typeof v==='string'&&v.startsWith('gh:'))refs.push([o,k,v.slice(3)]);else if(v&&typeof v==='object')walk(v)}};walk(d);
+  let done=0;
+  await Promise.all(refs.map(async([o,k,name])=>{
+    let url=null;try{url=await DB.get('img:'+name)}catch(e){}
+    if(!url){try{const raw=await GH.raw('images/'+name,true);const blob=new Blob([raw],{type:name.endsWith('.png')?'image/png':'image/jpeg'});url=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(blob)});DB.set('img:'+name,url).catch(()=>{})}catch(e){url=null}}
+    o[k]=url;done++;$('#saveSt').textContent=`写真を読み込み中… ${done}/${refs.length}`;
+  }));
+}
+async function pushShared(){
+  if(!shareReady()){alert('先に「06 共有の設定」でリポジトリとトークンを設定してください。');openSettings();return}
+  if(!CFG.name){alert('「06 共有の設定」で自分の名前を入れてください(誰が保存したか表示するためです)。');openSettings();return}
+  const path=issuePath();const st=$('#saveSt');
+  try{
+    st.textContent='共有を確認中…';
+    const cur=await GH.meta(path);const curSha=cur?cur.sha:null;
+    const mine=S.remote&&S.remote.path===path;
+    if(curSha&&mine&&curSha!==S.remote.sha){
+      if(!confirm('あなたが開いた後に、ほかの人がこの号を共有に保存しています。\nこのまま保存すると、その人の変更は消えます。\n\n[OK] 上書きして保存する\n[キャンセル] やめる(「共有から開く」で最新版を確認できます)'))return;
+    }else if(curSha&&!mine){
+      if(!confirm(`${issueLabel(path)}はすでに共有に保存されています。上書きしますか？`))return;
+    }
+    const {data,imgs}=packState();
+    data.savedBy=CFG.name;data.savedAt=new Date().toISOString();
+    const names=Object.keys(imgs);let up=[];try{up=(await DB.get('uploaded'))||[]}catch(e){}
+    let n=0;
+    for(const name of names){
+      n++;if(up.includes(name))continue;
+      st.textContent=`写真を共有に保存中… ${n}/${names.length}`;
+      const r=await GH.put('images/'+name,imgs[name].split(',')[1],null,'写真を追加');
+      if(!r.ok&&r.status!==422)throw new Error(await errMsg(r));
+      up.push(name);DB.set('img:'+name,imgs[name]).catch(()=>{});
+    }
+    DB.set('uploaded',up).catch(()=>{});
+    st.textContent='号のデータを保存中…';
+    const r=await GH.put(path,b64utf8(JSON.stringify(data)),curSha,`${issueLabel(path)}を更新(${CFG.name})`);
+    if(r.status===409||r.status===422){alert('保存の直前に、ほかの人が保存しました。もう一度「共有に保存」を押してください。');st.textContent='';return}
+    if(!r.ok)throw new Error(await errMsg(r));
+    const j=await r.json();
+    S.remote={path,sha:j.content.sha,savedBy:CFG.name,savedAt:data.savedAt,dirty:false};
+    save(false);shareStatus();st.textContent='共有に保存しました';
+  }catch(e){st.textContent='';alert('共有に保存できませんでした。\n'+e.message)}
+}
+async function listShared(){
+  if(!shareReady()){alert('先に「06 共有の設定」でリポジトリとトークンを設定してください。');openSettings();return}
+  try{
+    const list=(await GH.meta('issues'))||[];
+    const files=list.filter(f=>f.name.endsWith('.json')).sort((a,b)=>b.name.localeCompare(a.name));
+    $('#ilist').innerHTML=files.length?files.map(f=>`<button data-act="openIssue" data-path="${esc(f.path)}">${issueLabel(f.path)}${S.remote&&S.remote.path===f.path?'<small>(いま開いている号)</small>':''}</button>`).join(''):'<p class="help">まだ共有に保存された号はありません。いまの号を「共有に保存」すると、ここに表示されます。</p>';
+    $('#modal').hidden=false;
+  }catch(e){alert('共有の一覧を取得できませんでした。\n'+e.message)}
+}
+async function openShared(path,quiet){
+  if(!quiet&&S.remote&&S.remote.dirty&&!confirm('共有に保存していない変更があります。破棄して開きますか？'))return;
+  $('#modal').hidden=true;const st=$('#saveSt');
+  try{
+    st.textContent='共有から読み込み中…';
+    const m=await GH.meta(path);if(!m){alert('この号は共有に見つかりませんでした。');return}
+    const d=JSON.parse(await GH.raw(path));await unpackState(d);
+    S=load(d);S.remote={path,sha:m.sha,savedBy:d.savedBy||'',savedAt:d.savedAt||'',dirty:false};
+    ui.page=0;save(false);renderEditor();renderPreview();shareStatus();st.textContent='共有から開きました';
+  }catch(e){st.textContent='';alert('共有から開けませんでした。\n'+e.message)}
+}
+/* 起動時:ほかの人が新しく保存していないか確認 */
+async function checkRemote(){
+  if(!shareReady()||!S.remote)return;
+  try{const m=await GH.meta(S.remote.path);if(m&&m.sha!==S.remote.sha){
+    if(S.remote.dirty){alert(`${issueLabel(S.remote.path)}は、ほかの人が共有に新しく保存しています。\nあなたの未保存の変更と重なっているため、必要なら「データ書き出し」で控えを取ってから「共有から開く」で最新版を開いてください。`)}
+    else if(confirm(`${issueLabel(S.remote.path)}は、ほかの人が共有に新しく保存しています。最新版を読み込みますか？`))openShared(S.remote.path,true);
+  }}catch(e){}
+}
+function openSettings(){ui.page=ui.page;const el=$('#secShare');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}
+
+/* ============ QR ============ */
+const qrCache={};
+function qr(url){
+  if(!url||typeof QRCode==='undefined')return null;
+  if(qrCache[url])return qrCache[url];
+  const el=document.createElement('div');
+  try{new QRCode(el,{text:url,width:256,height:256,correctLevel:QRCode.CorrectLevel.M});
+    const c=el.querySelector('canvas');qrCache[url]=c?c.toDataURL():(el.querySelector('img')||{}).src}catch(e){return null}
+  return qrCache[url];
+}
+const qrBox=(url,label)=>{const d=qr(url);return d?`<div class="qrbox"><img class="qr" src="${d}" alt="QRコード">${label?`<span class="txt">${esc(label)}</span>`:''}</div>`:''};
+
+/* ============ 紙面描画 ============ */
+const ph=(src,pos)=>src?`<img class="ph" src="${src}" style="object-position:center ${pos}" alt="">`:`<div class="ph ph-empty">写真</div>`;
+const acc=b=>(COLORS[b.color]||COLORS.black)[1];
+/* 日付の(土)(日)を色付きの小さめ文字に */
+const dateHtml=s=>esc(s).replace(/\((.)\)/g,(m,w)=>`<span class="wk ${w==='土'?'wk-sat':(w==='日'||w==='祝')?'wk-sun':''}">(${w})</span>`);
+
+function renderMast(){
+  const h=S.header,m=S.meta;
+  const sns=[['qrHome','⌂'],['qrInsta','IG'],['qrLine','LINE']].map(([k,l])=>{const d=qr(h[k]);return d?`<div class="qrbox"><span>${l}</span><img class="qr" src="${d}" alt=""></div>`:''}).join('');
+  return `<header class="mast">
+    <div class="yu">${h.yu?'<div class="bx">料金後納</div>ゆうメール':''}</div>
+    <div class="ttl"><div class="sc">${esc(h.title)}</div><div class="no">${esc(m.year)}.${esc(m.month)} No.${esc(m.no)}</div>${sns?`<div class="sns">${sns}</div>`:''}</div>
+    <div class="co">${h.logo?`<img class="logo" src="${h.logo}" alt="">`:`<div class="lt">${esc(h.logoText)}</div>`}<div class="txt">${esc(h.company)}</div></div>
+  </header>`;
+}
+function photosHtml(arr,n,pos,cs,pl){
+  const list=arr.slice(0,n);
+  const v2=n===2&&(pl==='top'||pl==='bottom')?'':'';
+  return `<div class="phs n${n}${v2}">${list.map(p=>cs?`<div class="cs-ph">${ph(p.img,pos)}${p.cap?`<span class="cap">${esc(p.cap)}</span>`:''}</div>`:ph(p,pos)).join('')}</div>`;
+}
+function titleHtml(b,c){
+  if(!b.title)return'';
+  if(b.ts==='bar')return`<div class="c-bar" style="background:${c}">${dateHtml(b.title)}</div>`;
+  if(b.ts==='line')return`<div class="c-line" style="border-color:${c}">${esc(b.title)}</div>`;
+  return`<div class="c-center">${esc(b.title)}</div>`;
+}
+function renderBlock(b){
+  const c=acc(b);let inner='';
+  switch(b.type){
+    case 'openhouse':
+      if(b.style==='hero'){
+        inner=`<div class="hero ${b.tone==='light'?'lt':''}">${ph(b.photos[0],b.pos)}<div class="shade"></div>
+          <div class="hc"><div><div class="kind">${esc(b.kind)}</div><div class="lab">OPEN HOUSE</div><div class="dt">${dateHtml(b.date)}</div></div>
+          <div><div class="tt">${esc(b.title)}</div><div class="inf">${esc(b.info)}</div></div></div>
+          <div class="hb"><div class="bd fitchk">${esc(b.body)}</div>${qrBox(b.qr,b.qrcap)}</div></div>`;
+      }else{
+        inner=`<div class="ohs-top"><div><div class="kind" style="font-weight:700">${esc(b.kind)}</div><div class="lab">OPEN HOUSE</div></div><div class="dt" style="color:${c}">${dateHtml(b.date)}</div></div>
+          <div class="ohs-tt">${esc(b.title)}</div>
+          <div class="ohs-main">${ph(b.photos[0],b.pos)}<div class="c-tx fitchk" style="flex-direction:column;align-items:stretch"><div class="tc"><div class="txt">${esc(b.body)}</div><div class="info" style="border-color:${c}"><span>${esc(b.info)}</span></div></div>${qrBox(b.qr,b.qrcap)}</div></div>`;
+      }break;
+    case 'article':case 'event':{
+      const n=b.n||0;
+      const tx=`<div class="c-tx fitchk"><div class="tc">${b.body?`<div class="txt">${esc(b.body)}</div>`:''}${b.info?`<div class="info" style="border-color:${c}"><span>${esc(b.info)}</span></div>`:''}</div>${qrBox(b.qr,b.qrcap)}</div>`;
+      inner=`${titleHtml(b,c)}${b.sub?`<div class="c-sub">${esc(b.sub)}</div>`:''}${b.date?`<div class="c-date" style="color:${c}">${dateHtml(b.date)}</div>`:''}
+        <div class="c-main ${n?'pl-'+b.pl:'np'}">${n?photosHtml(b.photos,n,b.pos,false,b.pl):''}${tx}</div>`;break}
+    case 'banner':
+      inner=`<div class="bn" style="background:${c}"><div class="t">${esc(b.title)}</div>${b.sub?`<div class="s">${esc(b.sub)}</div>`:''}</div>`;break;
+    case 'modelhouse':
+      inner=`<div class="mh ${b.bar==='bottom'?'bb':''}"><div class="mh-bar" style="background:${c}">${qrBox(b.qr,b.qrcap)}<div class="tc"><div class="t">${esc(b.title)}</div><div class="s">${esc(b.sub)}<span class="tel">☎${esc(b.tel)}</span></div></div></div>
+        <div class="mh-cols">${b.models.map(m=>`<div class="mh-c"><div class="phw">${ph(m.photo,b.pos)}</div>${(()=>{const ls=String(m.desc||'').split('\n');const nm=ls.length>1?ls.pop():'';return `<div class="d">${esc(ls.join('\n'))}</div><div class="nm">${esc(nm)}</div>`})()}<div class="a">${esc(m.addr)}</div></div>`).join('')}</div></div>`;break;
+    case 'construction':
+      inner=`<div class="cs-bar" style="background:${c}"><span class="t">${esc(b.title)}</span><span class="n">${esc(b.note)}</span></div>
+        <div class="cs-main ${b.n?'':'np'}"><div class="cs-l fitchk"><table class="cs-tb">${b.stages.filter(s=>s.list.trim()).map(s=>`<tr><th>${esc(s.name)}</th><td>${s.list.split('\n').map(x=>x.trim()).filter(Boolean).map(x=>`<span class="cs-i">◎${esc(x)}</span>`).join('')}</td></tr>`).join('')}</table></div>${b.n?photosHtml(b.photos,b.n,b.pos,true):''}</div>`;break;
+  }
+  return `<div class="blk ${b.full?'full':'half'} fs-${b.fs} fr-${b.frame}" data-bid="${b.id}">${inner}</div>`;
+}
+/* 全幅は1行、半分幅は2つずつ横並び */
+function toRows(blocks){const out=[];for(let i=0;i<blocks.length;){const b=blocks[i];if(!b.full&&blocks[i+1]&&!blocks[i+1].full){out.push([b,blocks[i+1]]);i+=2}else{out.push([b]);i++}}return out}
+function renderRows(blocks){
+  return toRows(blocks).map(r=>{const fill=r.some(b=>b.fill);const h=Math.max(...r.map(b=>b.h));const two=r.length>1||!r[0].full;
+    return `<div class="rw ${two?'two':''} ${fill?'fill':''}" style="${fill?'':`height:${h}mm`}">${r.map(renderBlock).join('')}</div>`}).join('');
+}
+function renderPreview(){
+  const pane=$('#previewPane'),w=pane.clientWidth;
+  const s=w>=1150?Math.min(1,(w-80)/(2*794)):Math.min(1,(w-48)/794);
+  $('#pages').innerHTML=S.pages.map((blocks,i)=>`
+    <div class="pv" style="width:${794*s}px;height:${1123*s}px;--paper:${S.theme.paper};--head:${S.theme.head};--card:${S.theme.card}"><span class="lbl">${i?'裏面':'表面'}</span><span class="ov">はみ出しています</span>
+      <div class="sheet" style="transform:scale(${s})">${i===0?renderMast():''}<div class="flow">${renderRows(blocks)}</div></div></div>`).join('');
+  document.body.classList.toggle('bleed',!!S.meta.bleed);
+  $('#pageSize').textContent=S.meta.bleed?'@page{size:216mm 303mm;margin:0}':'@page{size:A4;margin:0}';
+  fitText();fitModelText();checkOverflow();
+}
+/* 文字サイズ「自動」:枠に収まるまで縮小 */
+function blockOver(el){
+  if(el.scrollHeight>el.clientHeight+1)return true;
+  if([...el.querySelectorAll('.fitchk')].some(x=>x.scrollHeight>x.clientHeight+1))return true;
+  return [...el.querySelectorAll('.phs>.ph,.phs>.cs-ph')].some(x=>x.clientHeight<34);
+}
+function fitText(){
+  document.querySelectorAll('.blk.fs-auto').forEach(el=>{for(const s of [9.5,9,8.5,8,7.5,7,6.5]){el.style.fontSize=s+'pt';if(!blockOver(el))break}});
+}
+function fitModelText(){
+  document.querySelectorAll('.mh-cols').forEach(g=>{['d','nm','a'].forEach(k=>{const els=[...g.querySelectorAll('.mh-c>.'+k)];if(!els.length)return;
+    els.forEach(e=>e.style.fontSize='');let fs=parseFloat(getComputedStyle(els[0]).fontSize);
+    const over=()=>els.some(e=>e.scrollWidth>e.clientWidth+1);
+    while(over()&&fs>5){fs-=.25;els.forEach(e=>e.style.fontSize=fs+'px')}})})
+}
+function checkOverflow(){
+  ui.over=[...document.querySelectorAll('.pv')].map(pv=>{
+    const f=pv.querySelector('.flow');let o=f.scrollHeight>f.clientHeight+2;
+    pv.querySelectorAll('.rw.fill').forEach(r=>{if(r.clientHeight<60)o=true});
+    pv.querySelectorAll('.blk').forEach(b=>{if(blockOver(b))o=true});
+    pv.classList.toggle('over',o);return o});
+  document.querySelectorAll('.tab[data-page]').forEach(t=>{const w=t.querySelector('.w');if(w)w.textContent=ui.over[+t.dataset.page]?'はみ出し':''});
+}
+const schedulePreview=()=>{clearTimeout(pvT);pvT=setTimeout(renderPreview,120)};
+
+/* ============ 編集パネル ============ */
+const inp=(scope,path,val,label,kind='text',extra='')=>{
+  const a=`data-scope="${scope}" data-path="${path}" ${extra}`;
+  const f=kind==='textarea'?`<textarea ${a} rows="3">${esc(val)}</textarea>`:`<input type="${kind}" ${a} value="${esc(val)}">`;
+  return `<label class="f"><span>${label}</span>${f}</label>`;
+};
+const sel=(scope,path,val,label,opts,extra='')=>`<label class="f"><span>${label}</span><select data-scope="${scope}" data-path="${path}" ${extra}>${Object.entries(opts).map(([k,v])=>`<option value="${k}" ${String(k)===String(val)?'selected':''}>${v}</option>`).join('')}</select></label>`;
+const photoIn=(bid,path,src,label)=>`<div class="phin"><div class="th" style="${src?`background-image:url(${src})`:''}"></div><label class="f" style="margin:0"><span>${label}</span><input type="file" accept="image/*" data-photo="${path}" data-bid="${bid}"></label>${src?`<button class="btn sm" data-act="clearPhoto" data-bid="${bid}" data-path="${path}">外す</button>`:''}</div>`;
+
+function blockFields(b){
+  const D=`data-bid="${b.id}"`;
+  const B=(p,v,l,k)=>inp('block',p,v,l,k,D);
+  const nSel=max=>sel('block','n',b.n,'写真の枚数',Object.fromEntries([...Array(max+1).keys()].map(i=>[i,i+'枚'])),`${D} data-num="1" data-struct="1"`);
+  const pics=max=>nSel(max)+b.photos.slice(0,b.n).map((p,i)=>photoIn(b.id,'photos.'+i,p,'写真'+(i+1))).join('');
+  switch(b.type){
+    case 'openhouse':return `<div class="row">${sel('block','style',b.style,'見せ方',{hero:'写真に文字を重ねる',standard:'写真と文字を分ける'},D+' data-struct="1"')}${b.style==='hero'?sel('block','tone',b.tone,'文字色',{dark:'黒文字(明るい写真)',light:'白文字(暗い写真)'},D):''}</div>`+
+      B('kind',b.kind,'見学会の種類(例:長期優良住宅 完成見学会)')+B('date',b.date,'日程(例:9/12(土)・13(日))')+B('title',b.title,'タイトル','textarea')+B('info',b.info,'時間・場所・工法・予約','textarea')+B('body',b.body,'説明文・特徴(写真の下に表示)','textarea')+B('qr',b.qr,'予約ページURL(QR)','url')+B('qrcap',b.qrcap,'QRの説明','textarea')+photoIn(b.id,'photos.0',b.photos[0],'メイン写真');
+    case 'article':case 'event':return `<div class="row">${sel('block','ts',b.ts,'見出しの形',{center:'中央・明朝',bar:'色帯',line:'下線'},D)}${b.n?sel('block','pl',b.pl,'写真の位置',{top:'上',bottom:'下',right:'右',left:'左'},D):''}</div>`+
+      B('title',b.title,'見出し','textarea')+B('sub',b.sub,'サブ見出し(例:「回遊できる中庭中心の平屋」)')+B('date',b.date,'日時(大きく表示)')+B('body',b.body,'本文','textarea')+B('info',b.info,'日程・会場・お問い合わせ(線の下に表示)','textarea')+B('qr',b.qr,'QRコードにするURL','url')+B('qrcap',b.qrcap,'QRの説明','textarea')+pics(b.type==='event'?4:3);
+    case 'banner':return B('title',b.title,'見出し','textarea')+B('sub',b.sub,'補足','textarea');
+    case 'modelhouse':return sel('block','bar',b.bar,'見出し帯の位置',{top:'上',bottom:'下'},D)+B('title',b.title,'見出し')+B('sub',b.sub,'営業時間')+B('tel',b.tel,'予約電話')+B('qr',b.qr,'予約ページURL(QR)','url')+B('qrcap',b.qrcap,'QRの説明','textarea')+
+      b.models.map((m,i)=>`<div class="grp"><b>モデルハウス${i+1}</b>${B(`models.${i}.desc`,m.desc,'紹介文・名称','textarea')}${B(`models.${i}.addr`,m.addr,'所在地・構造','textarea')}${photoIn(b.id,`models.${i}.photo`,m.photo,'写真')}</div>`).join('');
+    case 'construction':return B('title',b.title,'見出し')+B('note',b.note,'補足')+
+      `<div class="grp"><b>イニシャルで追加</b><div class="help">読み(カナまたはローマ字)を入れると「T.A様邸 伊勢崎市」の形で追加します。</div>
+        <div class="row"><input type="text" placeholder="姓の読み(例:アオキ)" data-ini="fam"><input type="text" placeholder="名の読み(例:タロウ)" data-ini="giv"></div>
+        <div class="row"><input type="text" placeholder="市町村(例:伊勢崎市)" data-ini="city" style="flex:1;width:auto"><select data-ini="stage" style="width:auto">${b.stages.map((s,i)=>`<option value="${i}">${esc(s.name)}</option>`).join('')}</select><button class="btn sm pri" data-act="addInitial" ${D}>追加</button></div></div>`+
+      b.stages.map((s,i)=>`<div class="grp">${B(`stages.${i}.name`,s.name,'工程名')}${B(`stages.${i}.list`,s.list,'1行に1件','textarea')}</div>`).join('')+
+      nSel(4)+b.photos.slice(0,b.n).map((p,i)=>`<div class="grp">${photoIn(b.id,`photos.${i}.img`,p.img,'写真'+(i+1))}${B(`photos.${i}.cap`,p.cap,'写真の説明(例:A様邸(渋川市))')}</div>`).join('');
+  }
+  return '';
+}
+function blockCard(b,pi,bi,len){
+  const t=(b.title||b.date||'').replace(/\n/g,' ');
+  const D=`data-bid="${b.id}"`;
+  return `<div class="card ${b.open?'on':''}" id="card-${b.id}">
+    <div class="ch" data-act="toggle" ${D}><span class="ty">${TYPES[b.type]}</span><span class="ti">${esc(t)}</span><span class="sz">${b.full?'全幅':'半分'}・${b.fill?'自動':b.h+'mm'}</span></div>
+    ${b.open?`<div class="cb">
+      <div class="ops">
+        <button class="btn sm" data-act="up" ${D} ${bi?'':'disabled'}>上へ</button>
+        <button class="btn sm" data-act="down" ${D} ${bi<len-1?'':'disabled'}>下へ</button>
+        <button class="btn sm" data-act="move" ${D}>${pi?'表面へ移動':'裏面へ移動'}</button>
+        <button class="btn sm" data-act="dup" ${D}>複製</button>
+        <button class="btn sm" data-act="del" ${D}>削除</button>
+      </div>
+      <div class="row">${sel('block','full',b.full?1:0,'幅',{1:'全幅',0:'半分'},D+' data-bool="1" data-struct="1"')}${sel('block','color',b.color,'色',Object.fromEntries(Object.entries(COLORS).map(([k,v])=>[k,v[0]])),D)}${sel('block','fs',b.fs,'文字の大きさ',{auto:'自動(収まるよう調整)',s:'小',m:'中',l:'大'},D)}</div>
+      <label class="chk" style="margin-bottom:6px"><input type="checkbox" data-scope="block" data-path="fill" ${D} ${b.fill?'checked':''}>高さ自動(残りの余白を埋める)</label>
+      ${b.fill?'':`<div class="row"><span style="font-size:12px;color:var(--muted)">高さ</span><input type="range" min="15" max="270" value="${b.h}" data-scope="block" data-path="h" data-num="1" ${D}><input type="number" min="15" max="270" value="${b.h}" style="width:70px" data-scope="block" data-path="h" data-num="1" ${D}>mm</div>`}
+      <div class="row">${b.type!=='banner'?sel('block','pos',b.pos,'写真の見せる位置',POS,D):''}${sel('block','frame',b.frame,'枠線',FRAMES,D)}</div>
+      ${blockFields(b)}
+    </div>`:''}
+  </div>`;
+}
+function renderEditor(){
+  const m=S.meta,h=S.header,M=(p,v,l,k,e='')=>inp('meta',p,v,l,k,e),H=(p,v,l,k)=>inp('header',p,v,l,k);
+  const blocks=S.pages[ui.page];
+  const addOpts=Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')+`<optgroup label="よく使う型">${Object.entries(PRESETS).map(([k,v])=>`<option value="p:${k}">${v[1]}</option>`).join('')}</optgroup>`;
+  $('#editor').innerHTML=`
+  <section class="sec"><h2><span class="n">01</span>号の情報</h2>
+    <div class="row">${M('year',m.year,'年','number','data-num="1"')}${sel('meta','month',m.month,'月',Object.fromEntries(MONTHS.map(x=>[x,x+'月'])),'data-num="1"')}${M('no',m.no,'号数(No.)','number','data-num="1" id="noIn"')}</div>
+    <label class="chk"><input type="checkbox" data-scope="meta" data-path="noAuto" ${m.noAuto?'checked':''}>号数を年・月から自動計算する(発行ごとに+1、2026年9月=No.281)</label>
+  </section>
+  <section class="sec"><h2><span class="n">02</span>この号のデザイン</h2>
+    ${sel('theme','preset',S.theme.preset,'配色',Object.assign(Object.fromEntries(Object.entries(THEMES).map(([k,v])=>[k,v[0]])),{custom:'自分で色を選ぶ'}),'data-struct="1"')}
+    <div class="row"><label class="f"><span>紙面の背景</span><input type="color" data-scope="theme" data-path="paper" value="${S.theme.paper}"></label><label class="f"><span>ヘッダーの背景</span><input type="color" data-scope="theme" data-path="head" value="${S.theme.head}"></label><label class="f"><span>枠付き記事の背景</span><input type="color" data-scope="theme" data-path="card" value="${S.theme.card}"></label></div>
+    <p class="help">配色は号ごとに保存されます(データ書き出しにも含まれます)。見出し帯や日付の色は、各ブロックの「色」で変えられます。背景に色を付けて紙の端まで印刷する場合は、プリントパック入稿時に「塗り足し」をオンにしてください。社内のプリンターでは端に白いフチが残ります。</p>
+  </section>
+  <section class="sec"><h2><span class="n">03</span>ヘッダー</h2>
+    <label class="chk" style="margin-bottom:8px"><input type="checkbox" data-scope="header" data-path="yu" ${h.yu?'checked':''}>「料金後納 ゆうメール」を表示</label>
+    ${H('title',h.title,'タイトル')}
+    ${H('qrHome',h.qrHome,'ホームページURL(QR)','url')}${H('qrInsta',h.qrInsta,'InstagramのURL(QR)','url')}${H('qrLine',h.qrLine,'LINEのURL(QR)','url')}
+    <div class="phin"><div class="th" style="${h.logo?`background-image:url(${h.logo});background-size:contain`:''}"></div><label class="f" style="margin:0"><span>ロゴ画像(SEKI DESIGN ARCHITECT+SEKIロゴ、PNG推奨)</span><input type="file" accept="image/*" data-photo="logo" data-scope="header"></label>${h.logo?'<button class="btn sm" data-act="clearLogo">外す</button>':''}</div>
+    ${h.logo?'':H('logoText',h.logoText,'ロゴ文字(画像がない場合)','textarea')}
+    ${H('company',h.company,'会社情報','textarea')}
+  </section>
+  <section class="sec"><h2><span class="n">04</span>紙面</h2>
+    <div class="tabs"><button class="tab ${ui.page===0?'on':''}" data-act="page" data-page="0">表面<span class="w"></span></button><button class="tab ${ui.page===1?'on':''}" data-act="page" data-page="1">裏面<span class="w"></span></button></div>
+    <p class="help">紙面のブロックをクリックすると編集欄が開きます。「高さ自動」のブロックが余白を埋めるので、情報が少ない月も多い月も高さを細かく合わせる必要はありません。半分幅のブロックは2つ続けると横に並びます。</p>
+    ${blocks.map((b,i)=>blockCard(b,ui.page,i,blocks.length)).join('')||'<p class="help">ブロックがありません。下から追加してください。</p>'}
+    <div class="add"><select id="addType" style="flex:1">${addOpts}</select><button class="btn pri" data-act="add">ブロックを追加</button></div>
+  </section>
+  <section class="sec"><h2><span class="n">05</span>保存・出力</h2>
+    ${sel('meta','order',m.order,'イニシャルの順番',{gf:'名.姓(青木 太郎 → T.A)',fg:'姓.名(青木 太郎 → A.T)'})}
+    <label class="chk" style="margin-bottom:10px"><input type="checkbox" data-scope="meta" data-path="bleed" ${m.bleed?'checked':''}>塗り足し3mmを付ける(プリントパック入稿用・216×303mm)</label>
+    <p class="help">印刷画面で「送信先:PDFに保存」「余白:なし」「背景のグラフィック:オン」にするとPDFになります。</p>
+    <div class="row"><button class="btn pri" data-act="print">印刷・PDF保存</button><button class="btn" data-act="export">データ書き出し</button><button class="btn" data-act="import">データ読み込み</button></div>
+    <p class="help">データは写真も含めてこの端末のブラウザに自動保存されます。号ごとの控えや別PCでの作業には「データ書き出し」を使ってください。</p>
+    <button class="btn sm" data-act="reset">サンプルに戻す</button>
+  </section>
+  <section class="sec" id="secShare"><h2><span class="n">06</span>共有の設定</h2>
+    <p class="help">号のデータと写真を社内のGitHubプライベートリポジトリに保存し、複数のスタッフで同じ号を開いて修正できます。設定はこのパソコンのブラウザにだけ保存されます。</p>
+    <label class="f"><span>自分の名前(保存者として表示)</span><input type="text" data-cfg="name" value="${esc(CFG.name)}"></label>
+    <label class="f"><span>リポジトリ(例:kitazume3432/smileclub-data)</span><input type="text" data-cfg="repo" value="${esc(CFG.repo)}"></label>
+    <label class="f"><span>アクセストークン</span><input type="password" data-cfg="token" value="${esc(CFG.token)}" autocomplete="off"></label>
+    <div class="row"><button class="btn sm" data-act="testShare">接続を確認</button><span class="help" id="testRes"></span></div>
+  </section>`;
+  checkOverflow();
+}
+
+/* ============ ユーティリティ ============ */
+function setPath(o,p,v){const ks=p.split('.');const last=ks.pop();const t=ks.reduce((a,k)=>a[k],o);t[last]=v}
+function findBlock(id){for(let p=0;p<2;p++){const i=S.pages[p].findIndex(b=>b.id===id);if(i>=0)return{p,i,b:S.pages[p][i]}}return null}
+function compress(file,max=1800){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{
+  const k=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+  const x=c.getContext('2d');const png=/png/.test(file.type);if(!png){x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height)}x.drawImage(im,0,0,c.width,c.height);
+  res(c.toDataURL(png?'image/png':'image/jpeg',.86))};im.onerror=rej;im.src=r.result};r.onerror=rej;r.readAsDataURL(file)})}
+const KMAP={A:'アァ',I:'イィ',U:'ウゥ',E:'エェ',O:'オォヲ',K:'カキクケコ',G:'ガギグゲゴ',S:'サシスセソ',Z:'ザズゼゾヅ',J:'ジヂ',T:'タツテト',C:'チ',D:'ダデド',N:'ナニヌネノ',H:'ハヒヘホ',F:'フ',B:'バビブベボ',P:'パピプペポ',M:'マミムメモ',Y:'ヤユヨャュョ',R:'ラリルレロ',W:'ワ',V:'ヴ'};
+function initial(s){s=(s||'').trim();if(!s)return'';let c=s[0];if(/[a-z]/i.test(c))return c.toUpperCase();const n=c.charCodeAt(0);if(n>=0x3041&&n<=0x3096)c=String.fromCharCode(n+0x60);for(const[k,v]of Object.entries(KMAP))if(v.includes(c))return k;return null}
+function nextIssue(){const m=S.meta;delete S.remote;setTimeout(shareStatus);const i=MONTHS.indexOf(+m.month);if(i===MONTHS.length-1||i<0){m.year=+m.year+1;m.month=1}else m.month=MONTHS[i+1];m.noAuto=true;m.no=calcNo(m.year,m.month)}
+
+/* ============ イベント ============ */
+const ed=$('#editor');
+ed.addEventListener('input',e=>{
+  const t=e.target,sc=t.dataset.scope;if(!sc||t.type==='file'||t.type==='checkbox')return;
+  let v=t.value;if(t.dataset.num)v=v===''?'':+v;if(t.dataset.bool)v=v==='1';
+  const obj=sc==='meta'?S.meta:sc==='header'?S.header:sc==='theme'?S.theme:findBlock(t.dataset.bid)?.b;if(!obj)return;
+  setPath(obj,t.dataset.path,v);
+  if(sc==='theme'){if(t.dataset.path==='preset'&&THEMES[v]){const th=THEMES[v];Object.assign(S.theme,{paper:th[1],head:th[2],card:th[3]})}else if(t.dataset.path!=='preset'){S.theme.preset='custom';const ps=ed.querySelector('[data-scope="theme"][data-path="preset"]');if(ps)ps.value='custom'}}
+  if(sc==='meta'&&(t.dataset.path==='year'||t.dataset.path==='month')&&S.meta.noAuto){S.meta.no=calcNo(S.meta.year,S.meta.month);const n=$('#noIn');if(n)n.value=S.meta.no}
+  if(sc==='meta'&&t.dataset.path==='no'){S.meta.noAuto=false;const c=ed.querySelector('[data-path="noAuto"]');if(c)c.checked=false}
+  if(t.dataset.path==='h'){ed.querySelectorAll(`[data-bid="${t.dataset.bid}"][data-path="h"]`).forEach(x=>{if(x!==t)x.value=v});const sz=$(`#card-${t.dataset.bid} .sz`);if(sz)sz.textContent=(obj.full?'全幅':'半分')+'・'+v+'mm'}
+  if(t.dataset.struct)renderEditor();
+  save();schedulePreview();
+});
+ed.addEventListener('input',e=>{const k=e.target.dataset.cfg;if(!k)return;CFG[k]=e.target.value.trim();saveCfg()});
+ed.addEventListener('change',async e=>{
+  const t=e.target;
+  if(t.type==='checkbox'&&t.dataset.scope){const sc=t.dataset.scope;const obj=sc==='meta'?S.meta:sc==='header'?S.header:findBlock(t.dataset.bid)?.b;setPath(obj,t.dataset.path,t.checked);
+    if(sc==='meta'&&t.dataset.path==='noAuto'&&t.checked)S.meta.no=calcNo(S.meta.year,S.meta.month);
+    if(sc==='block'||t.dataset.path==='noAuto')renderEditor();save();renderPreview();return}
+  if(t.type==='file'&&t.files[0]){
+    try{const d=await compress(t.files[0],t.dataset.scope==='header'?900:1800);
+      if(t.dataset.scope==='header')S.header.logo=d;else setPath(findBlock(t.dataset.bid).b,t.dataset.photo,d);
+      save();renderEditor();renderPreview()}catch(err){alert('画像を読み込めませんでした。JPEGかPNGの画像を選んでください。')}
+  }
+});
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');
+  if(!el){const blk=e.target.closest('.blk');if(blk){const f=findBlock(blk.dataset.bid);if(f){ui.page=f.p;S.pages.flat().forEach(b=>b.open=false);f.b.open=true;renderEditor();$('#card-'+f.b.id)?.scrollIntoView({behavior:'smooth',block:'start'})}}return}
+  const a=el.dataset.act,f=el.dataset.bid?findBlock(el.dataset.bid):null;
+  const arr=f?S.pages[f.p]:null;
+  switch(a){
+    case 'toggle':f.b.open=!f.b.open;renderEditor();return;
+    case 'page':ui.page=+el.dataset.page;renderEditor();return;
+    case 'up':[arr[f.i-1],arr[f.i]]=[arr[f.i],arr[f.i-1]];break;
+    case 'down':[arr[f.i+1],arr[f.i]]=[arr[f.i],arr[f.i+1]];break;
+    case 'move':arr.splice(f.i,1);S.pages[1-f.p].push(f.b);f.b.open=false;break;
+    case 'dup':{const c=clone(f.b);c.id=uid();arr.splice(f.i+1,0,c);break}
+    case 'del':if(!confirm(`「${TYPES[f.b.type]}」ブロックを削除しますか？`))return;arr.splice(f.i,1);break;
+    case 'clearPhoto':setPath(f.b,el.dataset.path,null);break;
+    case 'clearLogo':S.header.logo=null;break;
+    case 'add':{S.pages[ui.page].forEach(b=>b.open=false);const v=$('#addType').value;
+      const b=v.startsWith('p:')?mk(PRESETS[v.slice(2)][0],PRESETS[v.slice(2)][2]):mk(v);b.open=true;
+      S.pages[ui.page].push(b);save();renderEditor();renderPreview();$('#card-'+b.id)?.scrollIntoView({behavior:'smooth',block:'start'});return}
+    case 'addInitial':{
+      const card=el.closest('.grp');const g=k=>card.querySelector(`[data-ini="${k}"]`);
+      const fi=initial(g('fam').value),gi=initial(g('giv').value);
+      if(fi===null||gi===null||!fi){alert('姓・名の読みは、カナまたはローマ字で入力してください。');return}
+      const name=gi?(S.meta.order==='gf'?`${gi}.${fi}`:`${fi}.${gi}`):fi;
+      const st=f.b.stages[+g('stage').value];const city=g('city').value.trim();
+      st.list=(st.list.trim()?st.list.trim()+'\n':'')+`${name}様邸${city?' '+city:''}`;break}
+    case 'nextIssue':if(!confirm('次の号(1・3・5・7・9月)に切り替えます。紙面の内容はそのまま引き継ぐので、書き換えて使ってください。'))return;nextIssue();break;
+    case 'print':renderPreview();setTimeout(()=>window.print(),300);return;
+    case 'export':{const blob=new Blob([JSON.stringify(S)],{type:'application/json'});const u=URL.createObjectURL(blob);const x=document.createElement('a');x.href=u;x.download=`すまいるくらぶ_${S.meta.year}${String(S.meta.month).padStart(2,'0')}_No${S.meta.no}.json`;document.body.appendChild(x);x.click();x.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);return}
+    case 'import':$('#importFile').click();return;
+    case 'reset':if(!confirm('いまの内容を消してサンプルに戻します。必要なら先に「データ書き出し」をしてください。'))return;S=sampleState();shareStatus();break;
+    case 'pushShared':pushShared();return;
+    case 'openShared':listShared();return;
+    case 'openIssue':openShared(el.dataset.path);return;
+    case 'mclose':$('#modal').hidden=true;return;
+    case 'testShare':(async()=>{const t=$('#testRes');t.textContent='確認中…';try{const r=await fetch(`https://api.github.com/repos/${CFG.repo}`,{headers:GH.h(),cache:'no-store'});if(!r.ok)throw new Error(await errMsg(r));const j=await r.json();t.textContent=j.private?(j.permissions&&j.permissions.push===false?'読み取りのみ可能です(保存はできません)':'接続できました'):'接続できましたが、公開リポジトリです。プライベートにしてください';}catch(e){t.textContent=e.message}})();return;
+    default:return;
+  }
+  save();renderEditor();renderPreview();
+});
+function load(d){const rm=d.remote;d.theme=Object.assign(defTheme(),d.theme||{});d.pages=d.pages.map(p=>p.map(migrate));d.header=Object.assign(sampleState().header,d.header);if(rm)d.remote=rm;return d}
+$('#importFile').addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.pages||!d.meta)throw 0;delete d.remote;S=load(d);save();shareStatus();renderEditor();renderPreview()}catch(err){alert('このファイルは読み込めません。このツールで書き出したJSONファイルを選んでください。')}e.target.value=''};r.readAsText(file)});
+window.addEventListener('resize',schedulePreview);
+window.addEventListener('beforeprint',()=>{document.querySelectorAll('.pv .sheet').forEach(s=>s.style.transform='none')});
+window.addEventListener('afterprint',renderPreview);
+
+(async()=>{
+  await loadCfg();
+  try{S=await DB.get('current')}catch(e){S=null}
+  S=S&&S.v===2?load(S):sampleState();
+  renderEditor();renderPreview();shareStatus();checkRemote();
+  if(document.fonts)document.fonts.ready.then(()=>{fitText();fitModelText();checkOverflow()});
+})();
+</script>
+</body>
+</html>
