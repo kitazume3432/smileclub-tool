@@ -85,8 +85,13 @@ input[type=range]{flex:1}
 
 /* ヘッダー */
 .mast{background:var(--head,transparent);margin:-7mm -7mm 0;padding:7mm 7mm 2.5mm;display:grid;grid-template-columns:auto 1fr auto;gap:5mm;align-items:start;padding-bottom:1mm}
-.yu{width:20mm;text-align:center;font-size:7.5pt}
-.yu .bx{border:.35mm solid #222;height:13mm;display:flex;align-items:flex-start;justify-content:center;margin-bottom:1mm;font-size:8pt;padding-top:1mm}
+.yu{width:24mm}
+.pm{width:23mm;height:23mm;border:.35mm solid #111;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.2;color:#111;background:#fff}
+.pm.circle{border-radius:50%}
+.pm .po{font-size:7.5pt}
+.pm .ln{width:72%;border-top:.3mm solid #111;margin:1.2mm 0 1.4mm}
+.pm .kn{font-size:9.5pt;font-weight:700;letter-spacing:.06em}
+.pm .ym{font-size:8.5pt;margin-top:1mm}
 .ttl{text-align:center}
 .ttl .sc{font-family:"Noto Serif JP",Georgia,serif;font-weight:700;font-size:25pt;line-height:1.1;letter-spacing:.01em}
 .ttl .no{font-size:7.5pt;letter-spacing:.06em;margin-top:.5mm}
@@ -94,7 +99,7 @@ input[type=range]{flex:1}
 .sns .qrbox{flex-direction:row;gap:1mm;font-weight:700}
 .sns .qr{width:11mm;height:11mm}
 .co{font-size:6.8pt;line-height:1.45;max-width:72mm}
-.co .logo{max-height:15mm;max-width:70mm;display:block;margin-bottom:1.5mm}
+.co .logo{height:14mm;width:auto;max-width:70mm;display:block;margin-bottom:1.8mm}
 .co .lt{font-weight:900;font-size:13pt;line-height:1.02;margin-bottom:1.5mm;white-space:pre-line}
 
 /* 見学会:写真に文字を重ねる */
@@ -210,6 +215,10 @@ input[type=range]{flex:1}
   .blk:hover{outline:none}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+.upd{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#232323;color:#f3eee5;padding:10px 14px 10px 18px;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.3);display:flex;gap:12px;align-items:center;z-index:60;font-size:13px}
+.upd[hidden]{display:none}
+.upd button{background:#AD8A5C;color:#fff;border:0;border-radius:4px;padding:6px 12px;cursor:pointer;font:inherit}
+@media print{.upd{display:none!important}}
 </style>
 </head>
 <body>
@@ -217,9 +226,9 @@ input[type=range]{flex:1}
   <h1>すまいるくらぶ作成ツール</h1>
   <span class="st" id="saveSt"></span>
   <span class="sp"></span>
-  <span class="sh" id="shareSt" hidden></span>
-  <button class="btn" data-act="openShared">共有から開く</button>
-  <button class="btn" data-act="pushShared">共有に保存</button>
+  <span class="sh" id="fileSt" hidden></span>
+  <button class="btn" data-act="openFile">ファイルを開く</button>
+  <button class="btn" data-act="saveFile">上書き保存</button>
   <a class="btn" href="label.html" style="text-decoration:none">宛名ラベル</a>
   <button class="btn" data-act="nextIssue">次の号を作成</button>
   <button class="btn pri" data-act="print">印刷・PDF保存</button>
@@ -228,9 +237,9 @@ input[type=range]{flex:1}
   <aside class="editor" id="editor"></aside>
   <main class="preview" id="previewPane"><div class="pages" id="pages"></div></main>
 </div>
-<div class="modal" id="modal" hidden><div class="mbox"><h3>共有から開く</h3><div class="ilist" id="ilist"></div><button class="btn" data-act="mclose">閉じる</button></div></div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 
+<div class="upd" id="upd" hidden>ツールが新しくなりました。<button type="button" id="updBtn">最新版に切り替える</button></div>
 <script>
 /* ============ 定数 ============ */
 const MONTHS=[1,3,5,7,9];
@@ -291,7 +300,7 @@ function sampleState(){
   return {v:2,
     meta:{year:2026,month:9,no:281,noAuto:true,order:'gf',bleed:false},
     theme:defTheme(),
-    header:{yu:true,title:'Smile club',qrHome:'',qrInsta:'',qrLine:'',logo:null,logoText:'SEKI\nDESIGN\nARCHITECT',
+    header:{yu:true,title:'Smile club',qrHome:'',qrInsta:'',qrLine:'',logo:null,logoText:'',postOffice:'',yuShape:'square',
       company:'株式会社 関工務所\n群馬県利根郡川場村谷地1950 / ☎0278-52-2239\n群馬県高崎市新保町271-1 / ☎027-386-3432'},
     pages:[[
       mk('openhouse',{kind:'長期優良住宅 完成見学会',date:'9/12(土)・13(日)',title:'「光を招き木と暮らす\n北欧ナチュラルの家」',
@@ -314,111 +323,38 @@ const DB={db:null,
 };
 let S=null,ui={page:0,over:[]},saveT=null,pvT=null;
 const $=s=>document.querySelector(s);
-function save(dirty=true){if(dirty&&S.remote){S.remote.dirty=true;shareStatus()}clearTimeout(saveT);$('#saveSt').textContent='保存中…';saveT=setTimeout(async()=>{
+function save(dirty=true){if(dirty&&fh&&!ui.fileDirty){ui.fileDirty=true;fileStatus()}clearTimeout(saveT);$('#saveSt').textContent='保存中…';saveT=setTimeout(async()=>{
   try{await DB.set('current',S);$('#saveSt').textContent='この端末に保存済み'}catch(e){$('#saveSt').textContent='自動保存できませんでした(データ書き出しで保存してください)'}},500)}
 
-/* ============ 共有(GitHubのプライベートリポジトリ) ============ */
-let CFG={repo:'',token:'',name:''};
-async function loadCfg(){try{const c=await DB.get('cfg');if(c)Object.assign(CFG,c)}catch(e){}}
-function saveCfg(){DB.set('cfg',CFG).catch(()=>{})}
-const shareReady=()=>CFG.repo&&CFG.token;
-async function errMsg(r){const m={401:'トークンが正しくないか、期限切れです。',403:'このトークンには書き込み権限がありません。',404:'リポジトリが見つかりません(名前とトークンの対象リポジトリを確認してください)。'};return m[r.status]||`通信エラー(${r.status})`}
-const GH={
-  h(x={}){return Object.assign({'Authorization':'Bearer '+CFG.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},x)},
-  url(p){return `https://api.github.com/repos/${CFG.repo}/contents/${p.split('/').map(encodeURIComponent).join('/')}`},
-  async meta(p){const r=await fetch(this.url(p)+'?t='+Date.now(),{headers:this.h(),cache:'no-store'});if(r.status===404)return null;if(!r.ok)throw new Error(await errMsg(r));return r.json()},
-  async raw(p,blob){const r=await fetch(this.url(p)+'?t='+Date.now(),{headers:this.h({'Accept':'application/vnd.github.raw+json'}),cache:'no-store'});if(!r.ok)throw new Error(await errMsg(r));return blob?r.blob():r.text()},
-  put(p,b64,sha,msg){return fetch(this.url(p),{method:'PUT',headers:this.h({'Content-Type':'application/json'}),body:JSON.stringify(sha?{message:msg,content:b64,sha}:{message:msg,content:b64})})}
-};
-function b64utf8(str){const by=new TextEncoder().encode(str);let bin='';for(let i=0;i<by.length;i+=0x8000)bin+=String.fromCharCode.apply(null,by.subarray(i,i+0x8000));return btoa(bin)}
-function hashStr(str){let h1=0x811c9dc5,h2=0x1b873593;for(let i=0;i<str.length;i++){const c=str.charCodeAt(i);h1=Math.imul(h1^c,16777619);h2=Math.imul(h2^c,2654435761)}return(h1>>>0).toString(16).padStart(8,'0')+(h2>>>0).toString(16).padStart(8,'0')+str.length.toString(16)}
-const issuePath=()=>`issues/${S.meta.year}-${String(S.meta.month).padStart(2,'0')}.json`;
-const issueLabel=path=>{const m=path.match(/(\d{4})-(\d{2})/);return m?`${m[1]}年${+m[2]}月号`:path};
-const fmtDate=iso=>{if(!iso)return'';const d=new Date(iso);return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`};
-function shareStatus(){
-  const el=$('#shareSt');if(!el)return;
-  if(!S||!S.remote){el.hidden=true;return}
-  el.hidden=false;el.classList.toggle('dirty',!!S.remote.dirty);
-  el.textContent=S.remote.dirty?`共有:未保存の変更あり(${issueLabel(S.remote.path)})`:`共有:保存済み ${S.remote.savedBy||''} ${fmtDate(S.remote.savedAt)}`;
-}
-/* 写真は images/ に1枚ずつ保存し、号のデータには参照だけを入れる */
-function packState(){
-  const imgs={};const c=clone(S);delete c.remote;c.pages.forEach(p=>p.forEach(b=>delete b.open));
-  const walk=o=>{for(const k in o){const v=o[k];if(typeof v==='string'&&v.startsWith('data:image')){const ext=v.startsWith('data:image/png')?'png':'jpg';const name=hashStr(v)+'.'+ext;imgs[name]=v;o[k]='gh:'+name}else if(v&&typeof v==='object')walk(v)}};
-  walk(c);return{data:c,imgs};
-}
-async function unpackState(d){
-  const refs=[];const walk=o=>{for(const k in o){const v=o[k];if(typeof v==='string'&&v.startsWith('gh:'))refs.push([o,k,v.slice(3)]);else if(v&&typeof v==='object')walk(v)}};walk(d);
-  let done=0;
-  await Promise.all(refs.map(async([o,k,name])=>{
-    let url=null;try{url=await DB.get('img:'+name)}catch(e){}
-    if(!url){try{const raw=await GH.raw('images/'+name,true);const blob=new Blob([raw],{type:name.endsWith('.png')?'image/png':'image/jpeg'});url=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(blob)});DB.set('img:'+name,url).catch(()=>{})}catch(e){url=null}}
-    o[k]=url;done++;$('#saveSt').textContent=`写真を読み込み中… ${done}/${refs.length}`;
-  }));
-}
-async function pushShared(){
-  if(!shareReady()){alert('先に「06 共有の設定」でリポジトリとトークンを設定してください。');openSettings();return}
-  if(!CFG.name){alert('「06 共有の設定」で自分の名前を入れてください(誰が保存したか表示するためです)。');openSettings();return}
-  const path=issuePath();const st=$('#saveSt');
+/* ============ ファイルに保存(何日もかけて作るとき・別のPCへ引き継ぐとき) ============ */
+const LOGO='data:image/png;base64,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';
+let fh=null;
+const canFS=!!window.showSaveFilePicker;
+async function restoreHandle(){try{fh=(await DB.get('fileHandle'))||null}catch(e){fh=null}}
+function fileStatus(){const el=$('#fileSt');if(!el)return;if(!fh){el.hidden=true;return}el.hidden=false;el.classList.toggle('dirty',!!ui.fileDirty);el.textContent=(ui.fileDirty?'ファイル未保存:':'ファイル保存済み:')+fh.name}
+const defName=()=>`すまいるくらぶ_${S.meta.year}${String(S.meta.month).padStart(2,'0')}_No${S.meta.no}.json`;
+const FTYPES=[{description:'すまいるくらぶデータ',accept:{'application/json':['.json']}}];
+function exportJson(){const blob=new Blob([JSON.stringify(S)],{type:'application/json'});const u=URL.createObjectURL(blob);const x=document.createElement('a');x.href=u;x.download=defName();document.body.appendChild(x);x.click();x.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}
+async function saveFile(as){
+  if(!canFS){exportJson();return}
   try{
-    st.textContent='共有を確認中…';
-    const cur=await GH.meta(path);const curSha=cur?cur.sha:null;
-    const mine=S.remote&&S.remote.path===path;
-    if(curSha&&mine&&curSha!==S.remote.sha){
-      if(!confirm('あなたが開いた後に、ほかの人がこの号を共有に保存しています。\nこのまま保存すると、その人の変更は消えます。\n\n[OK] 上書きして保存する\n[キャンセル] やめる(「共有から開く」で最新版を確認できます)'))return;
-    }else if(curSha&&!mine){
-      if(!confirm(`${issueLabel(path)}はすでに共有に保存されています。上書きしますか？`))return;
-    }
-    const {data,imgs}=packState();
-    data.savedBy=CFG.name;data.savedAt=new Date().toISOString();
-    const names=Object.keys(imgs);let up=[];try{up=(await DB.get('uploaded'))||[]}catch(e){}
-    let n=0;
-    for(const name of names){
-      n++;if(up.includes(name))continue;
-      st.textContent=`写真を共有に保存中… ${n}/${names.length}`;
-      const r=await GH.put('images/'+name,imgs[name].split(',')[1],null,'写真を追加');
-      if(!r.ok&&r.status!==422)throw new Error(await errMsg(r));
-      up.push(name);DB.set('img:'+name,imgs[name]).catch(()=>{});
-    }
-    DB.set('uploaded',up).catch(()=>{});
-    st.textContent='号のデータを保存中…';
-    const r=await GH.put(path,b64utf8(JSON.stringify(data)),curSha,`${issueLabel(path)}を更新(${CFG.name})`);
-    if(r.status===409||r.status===422){alert('保存の直前に、ほかの人が保存しました。もう一度「共有に保存」を押してください。');st.textContent='';return}
-    if(!r.ok)throw new Error(await errMsg(r));
-    const j=await r.json();
-    S.remote={path,sha:j.content.sha,savedBy:CFG.name,savedAt:data.savedAt,dirty:false};
-    save(false);shareStatus();st.textContent='共有に保存しました';
-  }catch(e){st.textContent='';alert('共有に保存できませんでした。\n'+e.message)}
+    if(!fh||as){fh=await window.showSaveFilePicker({suggestedName:defName(),types:FTYPES});DB.set('fileHandle',fh).catch(()=>{})}
+    if((await fh.queryPermission({mode:'readwrite'}))!=='granted'&&(await fh.requestPermission({mode:'readwrite'}))!=='granted')throw new Error('ファイルへの書き込みが許可されませんでした。');
+    $('#saveSt').textContent='ファイルに保存中…';
+    const w=await fh.createWritable();await w.write(JSON.stringify(S));await w.close();
+    ui.fileDirty=false;fileStatus();$('#saveSt').textContent='ファイルに保存しました';
+  }catch(e){if(e.name==='AbortError')return;$('#saveSt').textContent='';alert('ファイルに保存できませんでした。\n'+e.message)}
 }
-async function listShared(){
-  if(!shareReady()){alert('先に「06 共有の設定」でリポジトリとトークンを設定してください。');openSettings();return}
+async function openFile(){
+  if(ui.fileDirty&&!confirm('ファイルに保存していない変更があります。保存せずに別のファイルを開きますか？'))return;
+  if(!canFS){$('#importFile').click();return}
   try{
-    const list=(await GH.meta('issues'))||[];
-    const files=list.filter(f=>f.name.endsWith('.json')).sort((a,b)=>b.name.localeCompare(a.name));
-    $('#ilist').innerHTML=files.length?files.map(f=>`<button data-act="openIssue" data-path="${esc(f.path)}">${issueLabel(f.path)}${S.remote&&S.remote.path===f.path?'<small>(いま開いている号)</small>':''}</button>`).join(''):'<p class="help">まだ共有に保存された号はありません。いまの号を「共有に保存」すると、ここに表示されます。</p>';
-    $('#modal').hidden=false;
-  }catch(e){alert('共有の一覧を取得できませんでした。\n'+e.message)}
+    const [h]=await window.showOpenFilePicker({types:FTYPES});
+    const d=JSON.parse(await (await h.getFile()).text());if(!d.pages||!d.meta)throw new Error('このツールで保存したファイルではありません。');
+    delete d.remote;S=load(d);fh=h;DB.set('fileHandle',h).catch(()=>{});
+    ui.fileDirty=false;ui.page=0;save(false);renderEditor();renderPreview();fileStatus();$('#saveSt').textContent='ファイルを開きました';
+  }catch(e){if(e.name==='AbortError')return;alert('ファイルを開けませんでした。\n'+e.message)}
 }
-async function openShared(path,quiet){
-  if(!quiet&&S.remote&&S.remote.dirty&&!confirm('共有に保存していない変更があります。破棄して開きますか？'))return;
-  $('#modal').hidden=true;const st=$('#saveSt');
-  try{
-    st.textContent='共有から読み込み中…';
-    const m=await GH.meta(path);if(!m){alert('この号は共有に見つかりませんでした。');return}
-    const d=JSON.parse(await GH.raw(path));await unpackState(d);
-    S=load(d);S.remote={path,sha:m.sha,savedBy:d.savedBy||'',savedAt:d.savedAt||'',dirty:false};
-    ui.page=0;save(false);renderEditor();renderPreview();shareStatus();st.textContent='共有から開きました';
-  }catch(e){st.textContent='';alert('共有から開けませんでした。\n'+e.message)}
-}
-/* 起動時:ほかの人が新しく保存していないか確認 */
-async function checkRemote(){
-  if(!shareReady()||!S.remote)return;
-  try{const m=await GH.meta(S.remote.path);if(m&&m.sha!==S.remote.sha){
-    if(S.remote.dirty){alert(`${issueLabel(S.remote.path)}は、ほかの人が共有に新しく保存しています。\nあなたの未保存の変更と重なっているため、必要なら「データ書き出し」で控えを取ってから「共有から開く」で最新版を開いてください。`)}
-    else if(confirm(`${issueLabel(S.remote.path)}は、ほかの人が共有に新しく保存しています。最新版を読み込みますか？`))openShared(S.remote.path,true);
-  }}catch(e){}
-}
-function openSettings(){ui.page=ui.page;const el=$('#secShare');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}
 
 /* ============ QR ============ */
 const qrCache={};
@@ -442,9 +378,9 @@ function renderMast(){
   const h=S.header,m=S.meta;
   const sns=[['qrHome','⌂'],['qrInsta','IG'],['qrLine','LINE']].map(([k,l])=>{const d=qr(h[k]);return d?`<div class="qrbox"><span>${l}</span><img class="qr" src="${d}" alt=""></div>`:''}).join('');
   return `<header class="mast">
-    <div class="yu">${h.yu?'<div class="bx">料金後納</div>ゆうメール':''}</div>
+    <div class="yu">${h.yu?`<div class="pm ${h.yuShape==='circle'?'circle':''}">${h.postOffice?`<div class="po">${esc(h.postOffice)}</div><div class="ln"></div>`:''}<div class="kn">料金後納</div><div class="ym">ゆうメール</div></div>`:''}</div>
     <div class="ttl"><div class="sc">${esc(h.title)}</div><div class="no">${esc(m.year)}.${esc(m.month)} No.${esc(m.no)}</div>${sns?`<div class="sns">${sns}</div>`:''}</div>
-    <div class="co">${h.logo?`<img class="logo" src="${h.logo}" alt="">`:`<div class="lt">${esc(h.logoText)}</div>`}<div class="txt">${esc(h.company)}</div></div>
+    <div class="co"><img class="logo" src="${h.logo||LOGO}" alt="SEKI DESIGN ARCHITECT"><div class="txt">${esc(h.company)}</div></div>
   </header>`;
 }
 function photosHtml(arr,n,pos,cs,pl){
@@ -596,11 +532,11 @@ function renderEditor(){
     <p class="help">配色は号ごとに保存されます(データ書き出しにも含まれます)。見出し帯や日付の色は、各ブロックの「色」で変えられます。背景に色を付けて紙の端まで印刷する場合は、プリントパック入稿時に「塗り足し」をオンにしてください。社内のプリンターでは端に白いフチが残ります。</p>
   </section>
   <section class="sec"><h2><span class="n">03</span>ヘッダー</h2>
-    <label class="chk" style="margin-bottom:8px"><input type="checkbox" data-scope="header" data-path="yu" ${h.yu?'checked':''}>「料金後納 ゆうメール」を表示</label>
+    <label class="chk" style="margin-bottom:8px"><input type="checkbox" data-scope="header" data-path="yu" ${h.yu?'checked':''}>料金後納(ゆうメール)の表示を入れる</label>
+    ${h.yu?`<div class="row">${H('postOffice',h.postOffice,'差出郵便局名(例:沼田局。空欄なら省略)')}${sel('header','yuShape',h.yuShape,'形',{square:'四角',circle:'丸'})}</div>`:''}
     ${H('title',h.title,'タイトル')}
     ${H('qrHome',h.qrHome,'ホームページURL(QR)','url')}${H('qrInsta',h.qrInsta,'InstagramのURL(QR)','url')}${H('qrLine',h.qrLine,'LINEのURL(QR)','url')}
-    <div class="phin"><div class="th" style="${h.logo?`background-image:url(${h.logo});background-size:contain`:''}"></div><label class="f" style="margin:0"><span>ロゴ画像(SEKI DESIGN ARCHITECT+SEKIロゴ、PNG推奨)</span><input type="file" accept="image/*" data-photo="logo" data-scope="header"></label>${h.logo?'<button class="btn sm" data-act="clearLogo">外す</button>':''}</div>
-    ${h.logo?'':H('logoText',h.logoText,'ロゴ文字(画像がない場合)','textarea')}
+    <div class="phin"><div class="th" style="background-image:url(${h.logo||LOGO});background-size:contain"></div><label class="f" style="margin:0"><span>ロゴ(別の画像に替える場合のみ選択)</span><input type="file" accept="image/*" data-photo="logo" data-scope="header"></label>${h.logo?'<button class="btn sm" data-act="clearLogo">標準ロゴに戻す</button>':''}</div>
     ${H('company',h.company,'会社情報','textarea')}
   </section>
   <section class="sec"><h2><span class="n">04</span>紙面</h2>
@@ -613,16 +549,10 @@ function renderEditor(){
     ${sel('meta','order',m.order,'イニシャルの順番',{gf:'名.姓(青木 太郎 → T.A)',fg:'姓.名(青木 太郎 → A.T)'})}
     <label class="chk" style="margin-bottom:10px"><input type="checkbox" data-scope="meta" data-path="bleed" ${m.bleed?'checked':''}>塗り足し3mmを付ける(プリントパック入稿用・216×303mm)</label>
     <p class="help">印刷画面で「送信先:PDFに保存」「余白:なし」「背景のグラフィック:オン」にするとPDFになります。</p>
-    <div class="row"><button class="btn pri" data-act="print">印刷・PDF保存</button><button class="btn" data-act="export">データ書き出し</button><button class="btn" data-act="import">データ読み込み</button></div>
-    <p class="help">データは写真も含めてこの端末のブラウザに自動保存されます。号ごとの控えや別PCでの作業には「データ書き出し」を使ってください。</p>
+    <div class="row"><button class="btn pri" data-act="print">印刷・PDF保存</button></div>
+    <div class="row"><button class="btn" data-act="saveFile">上書き保存</button><button class="btn" data-act="saveAs">名前を付けて保存</button><button class="btn" data-act="openFile">ファイルを開く</button></div>
+    <p class="help">作業中の内容は、写真も含めてこのパソコンのブラウザに自動保存されるので、画面を閉じても翌日そのまま続きから作れます。<br>あわせて、号ごとに「名前を付けて保存」で共有フォルダ(Zドライブなど)にファイルとして保存しておくと、控えになるほか、別のパソコンや別の担当者に引き継ぐこともできます。2回目からは「上書き保存」(Ctrl+S)で同じファイルに保存されます。</p>
     <button class="btn sm" data-act="reset">サンプルに戻す</button>
-  </section>
-  <section class="sec" id="secShare"><h2><span class="n">06</span>共有の設定</h2>
-    <p class="help">号のデータと写真を社内のGitHubプライベートリポジトリに保存し、複数のスタッフで同じ号を開いて修正できます。設定はこのパソコンのブラウザにだけ保存されます。</p>
-    <label class="f"><span>自分の名前(保存者として表示)</span><input type="text" data-cfg="name" value="${esc(CFG.name)}" autocomplete="off" name="sc-staff-name"></label>
-    <label class="f"><span>リポジトリ(例:kitazume3432/smileclub-data)</span><input type="text" data-cfg="repo" value="${esc(CFG.repo)}" autocomplete="off" name="sc-repo" placeholder="kitazume3432/smileclub-data"></label>
-    <label class="f"><span>アクセストークン</span><input type="password" data-cfg="token" value="${esc(CFG.token)}" autocomplete="new-password" name="sc-gh-token" placeholder="github_pat_で始まる文字列"></label>
-    <div class="row"><button class="btn sm" data-act="testShare">接続を確認</button><span class="help" id="testRes"></span></div>
   </section>`;
   checkOverflow();
 }
@@ -636,7 +566,7 @@ function compress(file,max=1800){return new Promise((res,rej)=>{const r=new File
   res(c.toDataURL(png?'image/png':'image/jpeg',.86))};im.onerror=rej;im.src=r.result};r.onerror=rej;r.readAsDataURL(file)})}
 const KMAP={A:'アァ',I:'イィ',U:'ウゥ',E:'エェ',O:'オォヲ',K:'カキクケコ',G:'ガギグゲゴ',S:'サシスセソ',Z:'ザズゼゾヅ',J:'ジヂ',T:'タツテト',C:'チ',D:'ダデド',N:'ナニヌネノ',H:'ハヒヘホ',F:'フ',B:'バビブベボ',P:'パピプペポ',M:'マミムメモ',Y:'ヤユヨャュョ',R:'ラリルレロ',W:'ワ',V:'ヴ'};
 function initial(s){s=(s||'').trim();if(!s)return'';let c=s[0];if(/[a-z]/i.test(c))return c.toUpperCase();const n=c.charCodeAt(0);if(n>=0x3041&&n<=0x3096)c=String.fromCharCode(n+0x60);for(const[k,v]of Object.entries(KMAP))if(v.includes(c))return k;return null}
-function nextIssue(){const m=S.meta;delete S.remote;setTimeout(shareStatus);const i=MONTHS.indexOf(+m.month);if(i===MONTHS.length-1||i<0){m.year=+m.year+1;m.month=1}else m.month=MONTHS[i+1];m.noAuto=true;m.no=calcNo(m.year,m.month)}
+function nextIssue(){const m=S.meta;fh=null;DB.set('fileHandle',null).catch(()=>{});ui.fileDirty=false;setTimeout(fileStatus);const i=MONTHS.indexOf(+m.month);if(i===MONTHS.length-1||i<0){m.year=+m.year+1;m.month=1}else m.month=MONTHS[i+1];m.noAuto=true;m.no=calcNo(m.year,m.month)}
 
 /* ============ イベント ============ */
 const ed=$('#editor');
@@ -652,12 +582,11 @@ ed.addEventListener('input',e=>{
   if(t.dataset.struct)renderEditor();
   save();schedulePreview();
 });
-ed.addEventListener('input',e=>{const k=e.target.dataset.cfg;if(!k)return;let v=e.target.value.trim();if(k==='repo')v=v.replace(/^https?:\/\/github\.com\//i,'').replace(/\.git$/,'').replace(/\/+$/,'');CFG[k]=v;saveCfg()});
 ed.addEventListener('change',async e=>{
   const t=e.target;
   if(t.type==='checkbox'&&t.dataset.scope){const sc=t.dataset.scope;const obj=sc==='meta'?S.meta:sc==='header'?S.header:findBlock(t.dataset.bid)?.b;setPath(obj,t.dataset.path,t.checked);
     if(sc==='meta'&&t.dataset.path==='noAuto'&&t.checked)S.meta.no=calcNo(S.meta.year,S.meta.month);
-    if(sc==='block'||t.dataset.path==='noAuto')renderEditor();save();renderPreview();return}
+    if(sc==='block'||sc==='header'||t.dataset.path==='noAuto')renderEditor();save();renderPreview();return}
   if(t.type==='file'&&t.files[0]){
     try{const d=await compress(t.files[0],t.dataset.scope==='header'?900:1800);
       if(t.dataset.scope==='header')S.header.logo=d;else setPath(findBlock(t.dataset.bid).b,t.dataset.photo,d);
@@ -689,33 +618,44 @@ document.addEventListener('click',e=>{
       const name=gi?(S.meta.order==='gf'?`${gi}.${fi}`:`${fi}.${gi}`):fi;
       const st=f.b.stages[+g('stage').value];const city=g('city').value.trim();
       st.list=(st.list.trim()?st.list.trim()+'\n':'')+`${name}様邸${city?' '+city:''}`;break}
-    case 'nextIssue':if(!confirm('次の号(1・3・5・7・9月)に切り替えます。紙面の内容はそのまま引き継ぐので、書き換えて使ってください。'))return;nextIssue();break;
+    case 'nextIssue':if(!confirm('次の号(1・3・5・7・9月)に切り替えます。紙面の内容はそのまま引き継ぐので、書き換えて使ってください。\n(今の号をファイルに保存していない場合は、先に「上書き保存」してください)'))return;nextIssue();break;
     case 'print':renderPreview();setTimeout(()=>window.print(),300);return;
-    case 'export':{const blob=new Blob([JSON.stringify(S)],{type:'application/json'});const u=URL.createObjectURL(blob);const x=document.createElement('a');x.href=u;x.download=`すまいるくらぶ_${S.meta.year}${String(S.meta.month).padStart(2,'0')}_No${S.meta.no}.json`;document.body.appendChild(x);x.click();x.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);return}
+    case 'export':exportJson();return;case 'exportOld':{const blob=new Blob([JSON.stringify(S)],{type:'application/json'});const u=URL.createObjectURL(blob);const x=document.createElement('a');x.href=u;x.download=`すまいるくらぶ_${S.meta.year}${String(S.meta.month).padStart(2,'0')}_No${S.meta.no}.json`;document.body.appendChild(x);x.click();x.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);return}
     case 'import':$('#importFile').click();return;
-    case 'reset':if(!confirm('いまの内容を消してサンプルに戻します。必要なら先に「データ書き出し」をしてください。'))return;S=sampleState();shareStatus();break;
-    case 'pushShared':pushShared();return;
-    case 'openShared':listShared();return;
-    case 'openIssue':openShared(el.dataset.path);return;
-    case 'mclose':$('#modal').hidden=true;return;
-    case 'testShare':(async()=>{const t=$('#testRes');if(!/^[\w.-]+\/[\w.-]+$/.test(CFG.repo)){t.textContent='リポジトリは「kitazume3432/smileclub-data」の形で入力してください。';return}if(!/^(github_pat_|ghp_)/.test(CFG.token)){t.textContent='トークンは「github_pat_」で始まる文字列を貼り付けてください。';return}t.textContent='確認中…';try{const r=await fetch(`https://api.github.com/repos/${CFG.repo}`,{headers:GH.h(),cache:'no-store'});if(!r.ok)throw new Error(await errMsg(r));const j=await r.json();t.textContent=j.private?(j.permissions&&j.permissions.push===false?'読み取りのみ可能です(保存はできません)':'接続できました'):'接続できましたが、公開リポジトリです。プライベートにしてください';}catch(e){t.textContent=e.message}})();return;
+    case 'reset':if(!confirm('いまの内容を消してサンプルに戻します。必要なら先に「名前を付けて保存」で控えを取ってください。'))return;S=sampleState();fh=null;DB.set('fileHandle',null).catch(()=>{});ui.fileDirty=false;fileStatus();break;
+    case 'saveFile':saveFile(false);return;
+    case 'saveAs':saveFile(true);return;
+    case 'openFile':openFile();return;
     default:return;
   }
   save();renderEditor();renderPreview();
 });
-function load(d){const rm=d.remote;d.theme=Object.assign(defTheme(),d.theme||{});d.pages=d.pages.map(p=>p.map(migrate));d.header=Object.assign(sampleState().header,d.header);if(rm)d.remote=rm;return d}
-$('#importFile').addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.pages||!d.meta)throw 0;delete d.remote;S=load(d);save();shareStatus();renderEditor();renderPreview()}catch(err){alert('このファイルは読み込めません。このツールで書き出したJSONファイルを選んでください。')}e.target.value=''};r.readAsText(file)});
+function load(d){if(d.header&&!d.header.logo)d.header.logo=null;const rm=d.remote;d.theme=Object.assign(defTheme(),d.theme||{});d.pages=d.pages.map(p=>p.map(migrate));d.header=Object.assign(sampleState().header,d.header);if(rm)d.remote=rm;return d}
+$('#importFile').addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.pages||!d.meta)throw 0;delete d.remote;S=load(d);save();fileStatus();renderEditor();renderPreview()}catch(err){alert('このファイルは読み込めません。このツールで書き出したJSONファイルを選んでください。')}e.target.value=''};r.readAsText(file)});
 window.addEventListener('resize',schedulePreview);
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveFile(false)}});
 window.addEventListener('beforeprint',()=>{document.querySelectorAll('.pv .sheet').forEach(s=>s.style.transform='none')});
 window.addEventListener('afterprint',renderPreview);
 
 (async()=>{
-  await loadCfg();
+  await restoreHandle();
   try{S=await DB.get('current')}catch(e){S=null}
   S=S&&S.v===2?load(S):sampleState();
-  renderEditor();renderPreview();shareStatus();checkRemote();
+  renderEditor();renderPreview();fileStatus();
   if(document.fonts)document.fonts.ready.then(()=>{fitText();fitModelText();checkOverflow()});
 })();
+
+/* ============ 自動更新チェック(GitHub Pagesで開いている場合) ============ */
+const APP_VERSION='2026.10.22-1';
+async function checkUpdate(){
+  if(!/^https?:/.test(location.protocol))return;
+  try{const r=await fetch(location.pathname+'?vc='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const m=(await r.text()).match(/const APP_VERSION='([^']+)'/);
+    if(m&&m[1]!==APP_VERSION)document.getElementById('upd').hidden=false;}catch(e){}
+}
+document.getElementById('updBtn').onclick=()=>location.replace(location.pathname+'?v='+Date.now());
+setTimeout(checkUpdate,3000);setInterval(checkUpdate,30*60*1000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate()});
 </script>
 </body>
 </html>
