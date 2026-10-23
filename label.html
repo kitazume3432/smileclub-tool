@@ -75,6 +75,10 @@ tr.off td{opacity:.45}
   .sheet{transform:none!important;box-shadow:none}
   .lb .no{display:none}
 }
+.upd{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#232323;color:#f3eee5;padding:10px 14px 10px 18px;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.3);display:flex;gap:12px;align-items:center;z-index:60;font-size:13px}
+.upd[hidden]{display:none}
+.upd button{background:#AD8A5C;color:#fff;border:0;border-radius:4px;padding:6px 12px;cursor:pointer;font:inherit}
+@media print{.upd{display:none!important}}
 </style>
 </head>
 <body>
@@ -117,6 +121,7 @@ tr.off td{opacity:.45}
   </aside>
   <main class="preview" id="pane"><div class="pages" id="pages"></div></main>
 </div>
+<div class="upd" id="upd" hidden>ツールが新しくなりました。<button type="button" id="updBtn">最新版に切り替える</button></div>
 <script>
 /* ============ 設定 ============ */
 const DEF={cols:3,rows:8,w:66,h:33.9,top:12.9,left:6,gapX:0,gapY:0,offX:0,offY:0,font:9,corpHon:'御中'};
@@ -286,6 +291,18 @@ window.addEventListener('beforeprint',()=>document.querySelectorAll('.sheet').fo
 window.addEventListener('afterprint',()=>renderPages());
 window.addEventListener('resize',()=>renderPages());
 renderCfg();renderStart();renderTable();renderPages();
+
+/* ============ 自動更新チェック(GitHub Pagesで開いている場合) ============ */
+const APP_VERSION='2026.10.22-1';
+async function checkUpdate(){
+  if(!/^https?:/.test(location.protocol))return;
+  try{const r=await fetch(location.pathname+'?vc='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const m=(await r.text()).match(/const APP_VERSION='([^']+)'/);
+    if(m&&m[1]!==APP_VERSION)document.getElementById('upd').hidden=false;}catch(e){}
+}
+document.getElementById('updBtn').onclick=()=>location.replace(location.pathname+'?v='+Date.now());
+setTimeout(checkUpdate,3000);setInterval(checkUpdate,30*60*1000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate()});
 </script>
 </body>
 </html>
