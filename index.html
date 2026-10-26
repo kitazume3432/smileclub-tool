@@ -252,7 +252,7 @@ input[type=range]{flex:1}
   <div class="row"><label class="f" style="flex:3"><span>読み取り用スクリプトのURL(?key=… まで含めて貼り付け。このパソコンにだけ保存されます)</span><input type="text" id="ktUrl" autocomplete="off"></label>
     <label class="f"><span>判定の基準日</span><select id="ktShift"><option value="0">発行月の初め</option><option value="-2">前月の中旬(原稿締切の頃)</option><option value="2">発行月の中旬</option></select></label>
     <button class="btn pri" data-act="ktFetch" style="align-self:flex-end">読み込む</button></div>
-  <p class="help" id="ktMsg"></p>
+  <p class="help" id="ktMsg"></p><p class="help" id="ktMem" style="margin-top:-6px"></p>
   <div class="ktwrap" id="ktTable"></div>
   <p class="help">読み(カナかローマ字の頭文字だけでも可)は一度入れれば、このパソコンに記憶され、次回からは自動で入ります。「表示」を直接書き換えることもできます(例:川場スキー場様寮)。工程の判定が違う場合は右の欄で変更してください。</p>
   <div class="row"><button class="btn pri" data-act="ktApply">建設中一覧に反映</button><button class="btn" data-act="ktClose">閉じる</button></div>
@@ -410,6 +410,7 @@ async function ktFetch(){
   try{
     const d=await (await fetch(KT.url,{cache:'no-store'})).json();
     if(!d.ok){msg.textContent=d.error==='key'?'合言葉(key)が違います。':'読み込めませんでした('+d.error+')。';return}
+    if(d.memory){ktShared=true;ktMerge(d.memory);ktNote('読みなどの記憶は、どのパソコンからでも共通で使われます。');ktFlush()}else{ktShared=false;ktNote('※スクリプトが古い版のため、読みの記憶はこのパソコンにだけ保存されます。')}
     const bp=(d.settings||[]).find(r=>r[0]==='basePeriod');ktBase=bp?+bp[1]||46:46;
     const t=issueT();const bars={};(d.bars||[]).forEach(b=>{(bars[b.rowId]=bars[b.rowId]||[]).push(b)});
     ktRows=(d.projects||[]).filter(p=>p.id&&p.name).map(p=>{const bs=bars[p.id]||[];
@@ -429,7 +430,32 @@ function ktRender(){
       <td><input type="text" data-kt="loc" data-i="${i}" value="${esc(r.loc)}" style="width:90px"></td><td style="white-space:nowrap">${r.range}</td>
       <td><select data-kt="stage" data-i="${i}">${STAGES.map(x=>`<option ${x===stage?'selected':''}>${x}</option>`).join('')}</select></td></tr>`}).join('')}</tbody></table>`:'<p class="help" style="padding:10px">該当する案件がありません。</p>';
 }
+/* 読み・表示などの記憶を、読み取り用スクリプトに保存(どのパソコンでも共通に) */
+let ktPending={},ktT=null,ktShared=false;
+function ktQ(k,v){ktPending[k]=v;clearTimeout(ktT);ktT=setTimeout(ktFlush,800)}
+function ktNote(t){const m=$('#ktMem');if(m)m.textContent=t}
+async function ktFlush(){
+  clearTimeout(ktT);
+  if(!KT.url||!ktShared||!Object.keys(ktPending).length)return;
+  const items=Object.entries(ktPending);ktPending={};
+  const chunks=[];let cur={},len=0;
+  for(const [k,v] of items){const l=encodeURIComponent(JSON.stringify([k,v])).length;if(len+l>1500&&len){chunks.push(cur);cur={};len=0}cur[k]=v;len+=l}
+  chunks.push(cur);
+  try{
+    for(const c of chunks){const u=KT.url+(KT.url.includes('?')?'&':'?')+'action=set&data='+encodeURIComponent(JSON.stringify(c));
+      const d=await (await fetch(u,{cache:'no-store'})).json();if(!d.ok||d.saved===undefined)throw 0}
+    ktNote('✓ 読みなどの記憶を保存しました(他のパソコンでも使えます)');
+  }catch(e){items.forEach(([k,v])=>{if(!(k in ktPending))ktPending[k]=v});ktNote('記憶の保存に失敗しました。このパソコンには残っているので、次に読み込んだときに再送します。')}
+}
+function ktMerge(m){
+  const map={dict:'d',over:'o',stage:'s',off:'f'};
+  for(const [t,pre] of Object.entries(map)){const srv=m[t]||{};
+    for(const k in KT[t])if(!(k in srv))ktPending[pre+':'+k]=String(KT[t][k]); /* このパソコンにだけある記憶は送る */
+    KT[t]=Object.assign({},KT[t],srv)}
+  saveKT();
+}
 function ktApply(){
+  ktFlush();
   const f=findBlock(ktBid);if(!f)return;const b=f.b;
   const lists={};STAGES.forEach(x=>lists[x]=[]);let miss=0;
   ktRows.forEach(r=>{if(KT.off[r.id])return;const d=ktDisplay(r);if(!d){miss++;return}lists[KT.stage[r.id]||r.auto].push(`${d}${r.loc?' '+r.loc:''}`)});
@@ -438,16 +464,16 @@ function ktApply(){
   $('#ktModal').hidden=true;save();renderEditor();renderPreview();
 }
 const ktInput=e=>{const t=e.target,k=t.dataset.kt;if(!k||t.type==='checkbox'||t.tagName==='SELECT')return;const r=ktRows[+t.dataset.i];
-  if(k==='read'&&e.type==='change'){const part=r.parts[+t.dataset.part];const v=initial(t.value);if(v){KT.dict[part]=v;t.value=v;t.classList.remove('need')}else if(!t.value.trim())delete KT.dict[part];
+  if(k==='read'&&e.type==='change'){const part=r.parts[+t.dataset.part];const v=initial(t.value);if(v){KT.dict[part]=v;ktQ('d:'+part,v);t.value=v;t.classList.remove('need')}else if(!t.value.trim()){delete KT.dict[part];ktQ('d:'+part,'')}
     const di=$(`[data-kt="disp"][data-i="${t.dataset.i}"]`);if(di&&!KT.over[r.id]){di.value=ktDisplay(r);di.classList.toggle('need',!di.value)}
     ktRows.forEach((o,j)=>{if(j!==+t.dataset.i&&o.parts&&o.parts.includes(part)){$(`[data-kt="read"][data-i="${j}"][data-part="${o.parts.indexOf(part)}"]`).value=KT.dict[part]||'';const dj=$(`[data-kt="disp"][data-i="${j}"]`);if(dj&&!KT.over[o.id]){dj.value=ktDisplay(o);dj.classList.toggle('need',!dj.value)}}})}
-  if(k==='disp'){const auto=(()=>{const o=KT.over[r.id];delete KT.over[r.id];const a=ktDisplay(r);if(o)KT.over[r.id]=o;return a})();if(t.value.trim()&&t.value.trim()!==auto)KT.over[r.id]=t.value.trim();else delete KT.over[r.id];t.classList.toggle('need',!t.value.trim())}
+  if(k==='disp'){const auto=(()=>{const o=KT.over[r.id];delete KT.over[r.id];const a=ktDisplay(r);if(o)KT.over[r.id]=o;return a})();if(t.value.trim()&&t.value.trim()!==auto){KT.over[r.id]=t.value.trim();ktQ('o:'+r.id,KT.over[r.id])}else if(KT.over[r.id]!==undefined){delete KT.over[r.id];ktQ('o:'+r.id,'')}t.classList.toggle('need',!t.value.trim())}
   if(k==='loc')r.loc=t.value;
   saveKT();};
 document.addEventListener('input',ktInput);document.addEventListener('change',ktInput);
 document.addEventListener('change',e=>{const t=e.target,k=t.dataset.kt;if(!k)return;const r=ktRows[+t.dataset.i];
-  if(k==='on'){if(t.checked)delete KT.off[r.id];else KT.off[r.id]=1;t.closest('tr').classList.toggle('off',!t.checked)}
-  if(k==='stage'){if(t.value===r.auto)delete KT.stage[r.id];else KT.stage[r.id]=t.value}
+  if(k==='on'){if(t.checked){delete KT.off[r.id];ktQ('f:'+r.id,'')}else{KT.off[r.id]=1;ktQ('f:'+r.id,'1')}t.closest('tr').classList.toggle('off',!t.checked)}
+  if(k==='stage'){if(t.value===r.auto){delete KT.stage[r.id];ktQ('s:'+r.id,'')}else{KT.stage[r.id]=t.value;ktQ('s:'+r.id,t.value)}}
   saveKT();});
 
 /* ============ QR ============ */
@@ -720,7 +746,7 @@ document.addEventListener('click',e=>{
     case 'ktOpen':ktBid=el.dataset.bid;$('#ktUrl').value=KT.url;$('#ktShift').value=String(KT.shift||0);$('#ktModal').hidden=false;if(KT.url)ktFetch();else{$('#ktMsg').textContent='最初に、読み取り用スクリプトのURLを貼り付けて「読み込む」を押してください。';$('#ktTable').innerHTML=''}return;
     case 'ktFetch':ktFetch();return;
     case 'ktApply':ktApply();return;
-    case 'ktClose':$('#ktModal').hidden=true;return;
+    case 'ktClose':ktFlush();$('#ktModal').hidden=true;return;
     case 'saveFile':saveFile(false);return;
     case 'saveAs':saveFile(true);return;
     case 'openFile':openFile();return;
@@ -744,7 +770,7 @@ window.addEventListener('afterprint',renderPreview);
 })();
 
 /* ============ 自動更新チェック(GitHub Pagesで開いている場合) ============ */
-const APP_VERSION='2026.10.26-1';
+const APP_VERSION='2026.10.26-2';
 async function checkUpdate(){
   if(!/^https?:/.test(location.protocol))return;
   try{const r=await fetch(location.pathname+'?vc='+Date.now(),{cache:'no-store'});if(!r.ok)return;
