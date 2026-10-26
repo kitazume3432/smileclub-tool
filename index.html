@@ -193,6 +193,16 @@ input[type=range]{flex:1}
 .cs-ph{position:relative;min-height:0}
 .cs-ph .cap{position:absolute;left:0;top:0;background:rgba(255,255,255,.85);font-size:6.5pt;padding:.3mm 1.5mm}
 
+.mbox.wide{width:min(1040px,96vw)}
+.ktt{width:100%;border-collapse:collapse;font-size:12px}
+.ktt th,.ktt td{border-bottom:1px solid var(--line);padding:4px 5px;text-align:left;vertical-align:middle}
+.ktt th{position:sticky;top:0;background:var(--panel)}
+.ktt input[type=text]{padding:3px 5px;font-size:12px}
+.ktt select{padding:3px 4px;font-size:12px}
+.ktt tr.off td{opacity:.45}
+.ktt .need{border-color:var(--warn)}
+.ktwrap{max-height:56vh;overflow:auto;border:1px solid var(--line);border-radius:6px;scrollbar-width:none}
+.ktwrap::-webkit-scrollbar{display:none}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50}
 .modal[hidden]{display:none}
 .mbox{background:var(--panel);color:var(--ink);border-radius:8px;padding:20px;width:min(460px,92vw);max-height:80vh;overflow:auto}
@@ -237,6 +247,16 @@ input[type=range]{flex:1}
   <aside class="editor" id="editor"></aside>
   <main class="preview" id="previewPane"><div class="pages" id="pages"></div></main>
 </div>
+<div class="modal" id="ktModal" hidden><div class="mbox wide">
+  <h3>工程表から建設中一覧を読み込む</h3>
+  <div class="row"><label class="f" style="flex:3"><span>読み取り用スクリプトのURL(?key=… まで含めて貼り付け。このパソコンにだけ保存されます)</span><input type="text" id="ktUrl" autocomplete="off"></label>
+    <label class="f"><span>判定の基準日</span><select id="ktShift"><option value="0">発行月の初め</option><option value="-2">前月の中旬(原稿締切の頃)</option><option value="2">発行月の中旬</option></select></label>
+    <button class="btn pri" data-act="ktFetch" style="align-self:flex-end">読み込む</button></div>
+  <p class="help" id="ktMsg"></p>
+  <div class="ktwrap" id="ktTable"></div>
+  <p class="help">読み(カナかローマ字の頭文字だけでも可)は一度入れれば、このパソコンに記憶され、次回からは自動で入ります。「表示」を直接書き換えることもできます(例:川場スキー場様寮)。工程の判定が違う場合は右の欄で変更してください。</p>
+  <div class="row"><button class="btn pri" data-act="ktApply">建設中一覧に反映</button><button class="btn" data-act="ktClose">閉じる</button></div>
+</div></div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 
 <div class="upd" id="upd" hidden>ツールが新しくなりました。<button type="button" id="updBtn">最新版に切り替える</button></div>
@@ -355,6 +375,80 @@ async function openFile(){
     ui.fileDirty=false;ui.page=0;save(false);renderEditor();renderPreview();fileStatus();$('#saveSt').textContent='ファイルを開きました';
   }catch(e){if(e.name==='AbortError')return;alert('ファイルを開けませんでした。\n'+e.message)}
 }
+
+/* ============ 工程表から読み込み ============ */
+const KT={url:'',shift:0,dict:{},over:{},stage:{},off:{}};
+async function loadKT(){try{const v=await DB.get('koutei');if(v)Object.assign(KT,v)}catch(e){}}
+const saveKT=()=>DB.set('koutei',KT).catch(()=>{});
+const STAGES=['完成','仕上工事','造作工事','基礎工事','準備工事'];
+let ktBase=46,ktRows=[],ktBid=null;
+const y0=()=>ktBase+1976; /* 例:46期=2022年7月始まり(50期=2026年7月) */
+const issueT=()=>((+S.meta.year-y0())*12+(+S.meta.month-7))*4+(+KT.shift||0);
+const tYM=t=>{const tot=y0()*12+6+Math.floor(t/4);return `${Math.floor(tot/12)}/${tot%12+1}`};
+function judge(bs,t){
+  if(!bs.length)return'';
+  const st=Math.min(...bs.map(b=>+b.start)),en=Math.max(...bs.map(b=>+b.end));
+  if(t<st)return st-t<=24?'準備工事':'';
+  if(t>en)return t-en<=8?'完成':'';
+  const cp=bs.filter(b=>String(b.kind)==='carpenter');
+  if(cp.length){const cs=Math.min(...cp.map(b=>+b.start)),ce=Math.max(...cp.map(b=>+b.end));return t<cs?'基礎工事':t>ce?'仕上工事':'造作工事'}
+  const cur=String((bs.find(b=>+b.start<=t&&t<=+b.end)||{}).label||'');
+  return /基礎/.test(cur)?'基礎工事':/仕上/.test(cur)?'仕上工事':'造作工事';
+}
+function splitName(n){const c=String(n||'').replace(/[\s　]*様[\s　]*$/,'').trim();const ps=c.split(/[\s　]+/).filter(Boolean);return ps.length===2?ps:null}
+function ktDisplay(r){
+  if(KT.over[r.id])return KT.over[r.id];
+  if(!r.parts)return'';
+  const fi=KT.dict[r.parts[0]],gi=KT.dict[r.parts[1]];
+  if(!fi||!gi)return'';
+  return (S.meta.order==='gf'?`${gi}.${fi}`:`${fi}.${gi}`)+'様邸';
+}
+async function ktFetch(){
+  const msg=$('#ktMsg');KT.url=$('#ktUrl').value.trim();KT.shift=+$('#ktShift').value;saveKT();
+  if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(KT.url)||!/key=/.test(KT.url)){msg.textContent='スクリプトのURL(最後に ?key=… が付いたもの)を貼り付けてください。';return}
+  msg.textContent='読み込み中…';
+  try{
+    const d=await (await fetch(KT.url,{cache:'no-store'})).json();
+    if(!d.ok){msg.textContent=d.error==='key'?'合言葉(key)が違います。':'読み込めませんでした('+d.error+')。';return}
+    const bp=(d.settings||[]).find(r=>r[0]==='basePeriod');ktBase=bp?+bp[1]||46:46;
+    const t=issueT();const bars={};(d.bars||[]).forEach(b=>{(bars[b.rowId]=bars[b.rowId]||[]).push(b)});
+    ktRows=(d.projects||[]).filter(p=>p.id&&p.name).map(p=>{const bs=bars[p.id]||[];
+      const auto=judge(bs,t);const st=bs.length?Math.min(...bs.map(b=>+b.start)):null,en=bs.length?Math.max(...bs.map(b=>+b.end)):null;
+      return{id:p.id,order:+p.order||0,name:String(p.name),loc:String(p.location||''),parts:splitName(p.name),auto,range:bs.length?`${tYM(st)}〜${tYM(en)}`:'工程なし'}})
+      .filter(r=>r.auto||KT.stage[r.id]).sort((a,b)=>a.order-b.order);
+    msg.textContent=`${S.meta.year}年${S.meta.month}月号の基準日(${tYM(issueT())}月)時点で、建設中・準備中・最近完成の案件 ${ktRows.length}件を表示しています。`;
+    ktRender();
+  }catch(e){msg.textContent='読み込めませんでした。URLが正しいか、スクリプトが「全員」に公開されているか確認してください。'}
+}
+function ktRender(){
+  $('#ktTable').innerHTML=ktRows.length?`<table class="ktt"><thead><tr><th>載せる</th><th>案件名</th><th>姓の読み</th><th>名の読み</th><th>紙面の表示</th><th>市町村</th><th>工期</th><th>工程</th></tr></thead><tbody>${ktRows.map((r,i)=>{
+    const disp=ktDisplay(r),stage=KT.stage[r.id]||r.auto,on=!KT.off[r.id];
+    const rd=k=>r.parts?`<input type="text" data-kt="read" data-i="${i}" data-part="${k}" value="${esc(KT.dict[r.parts[k]]||'')}" placeholder="${esc(r.parts[k])}" class="${KT.dict[r.parts[k]]?'':'need'}" style="width:90px">`:'';
+    return`<tr class="${on?'':'off'}"><td><input type="checkbox" data-kt="on" data-i="${i}" ${on?'checked':''}></td><td>${esc(r.name)}</td><td>${rd(0)}</td><td>${rd(1)}</td>
+      <td><input type="text" data-kt="disp" data-i="${i}" value="${esc(disp)}" class="${disp?'':'need'}" placeholder="例:T.A様邸" style="width:120px"></td>
+      <td><input type="text" data-kt="loc" data-i="${i}" value="${esc(r.loc)}" style="width:90px"></td><td style="white-space:nowrap">${r.range}</td>
+      <td><select data-kt="stage" data-i="${i}">${STAGES.map(x=>`<option ${x===stage?'selected':''}>${x}</option>`).join('')}</select></td></tr>`}).join('')}</tbody></table>`:'<p class="help" style="padding:10px">該当する案件がありません。</p>';
+}
+function ktApply(){
+  const f=findBlock(ktBid);if(!f)return;const b=f.b;
+  const lists={};STAGES.forEach(x=>lists[x]=[]);let miss=0;
+  ktRows.forEach(r=>{if(KT.off[r.id])return;const d=ktDisplay(r);if(!d){miss++;return}lists[KT.stage[r.id]||r.auto].push(`${d}${r.loc?' '+r.loc:''}`)});
+  if(miss&&!confirm(`紙面の表示(イニシャル)が空欄の案件が${miss}件あります。この${miss}件を除いて反映しますか？`))return;
+  STAGES.forEach(x=>{let st=b.stages.find(s=>s.name.replace(/\s/g,'')===x||(x==='仕上工事'&&/仕上/.test(s.name)));if(!st){st={name:x,list:''};b.stages.push(st)}st.list=lists[x].join('\n')});
+  $('#ktModal').hidden=true;save();renderEditor();renderPreview();
+}
+const ktInput=e=>{const t=e.target,k=t.dataset.kt;if(!k||t.type==='checkbox'||t.tagName==='SELECT')return;const r=ktRows[+t.dataset.i];
+  if(k==='read'&&e.type==='change'){const part=r.parts[+t.dataset.part];const v=initial(t.value);if(v){KT.dict[part]=v;t.value=v;t.classList.remove('need')}else if(!t.value.trim())delete KT.dict[part];
+    const di=$(`[data-kt="disp"][data-i="${t.dataset.i}"]`);if(di&&!KT.over[r.id]){di.value=ktDisplay(r);di.classList.toggle('need',!di.value)}
+    ktRows.forEach((o,j)=>{if(j!==+t.dataset.i&&o.parts&&o.parts.includes(part)){$(`[data-kt="read"][data-i="${j}"][data-part="${o.parts.indexOf(part)}"]`).value=KT.dict[part]||'';const dj=$(`[data-kt="disp"][data-i="${j}"]`);if(dj&&!KT.over[o.id]){dj.value=ktDisplay(o);dj.classList.toggle('need',!dj.value)}}})}
+  if(k==='disp'){const auto=(()=>{const o=KT.over[r.id];delete KT.over[r.id];const a=ktDisplay(r);if(o)KT.over[r.id]=o;return a})();if(t.value.trim()&&t.value.trim()!==auto)KT.over[r.id]=t.value.trim();else delete KT.over[r.id];t.classList.toggle('need',!t.value.trim())}
+  if(k==='loc')r.loc=t.value;
+  saveKT();};
+document.addEventListener('input',ktInput);document.addEventListener('change',ktInput);
+document.addEventListener('change',e=>{const t=e.target,k=t.dataset.kt;if(!k)return;const r=ktRows[+t.dataset.i];
+  if(k==='on'){if(t.checked)delete KT.off[r.id];else KT.off[r.id]=1;t.closest('tr').classList.toggle('off',!t.checked)}
+  if(k==='stage'){if(t.value===r.auto)delete KT.stage[r.id];else KT.stage[r.id]=t.value}
+  saveKT();});
 
 /* ============ QR ============ */
 const qrCache={};
@@ -487,7 +581,7 @@ function blockFields(b){
     case 'banner':return B('title',b.title,'見出し','textarea')+B('sub',b.sub,'補足','textarea');
     case 'modelhouse':return sel('block','bar',b.bar,'見出し帯の位置',{top:'上',bottom:'下'},D)+B('title',b.title,'見出し')+B('sub',b.sub,'営業時間')+B('tel',b.tel,'予約電話')+B('qr',b.qr,'予約ページURL(QR)','url')+B('qrcap',b.qrcap,'QRの説明','textarea')+
       b.models.map((m,i)=>`<div class="grp"><b>モデルハウス${i+1}</b>${B(`models.${i}.desc`,m.desc,'紹介文・名称','textarea')}${B(`models.${i}.addr`,m.addr,'所在地・構造','textarea')}${photoIn(b.id,`models.${i}.photo`,m.photo,'写真')}</div>`).join('');
-    case 'construction':return B('title',b.title,'見出し')+B('note',b.note,'補足')+
+    case 'construction':return `<div class="grp"><b>工程表から読み込む</b><div class="help">全体工程表のデータから、発行月時点の工程別の一覧を自動で作ります。</div><button class="btn sm pri" data-act="ktOpen" ${D}>工程表から読み込む</button></div>`+B('title',b.title,'見出し')+B('note',b.note,'補足')+
       `<div class="grp"><b>イニシャルで追加</b><div class="help">読み(カナまたはローマ字)を入れると「T.A様邸 伊勢崎市」の形で追加します。</div>
         <div class="row"><input type="text" placeholder="姓の読み(例:アオキ)" data-ini="fam"><input type="text" placeholder="名の読み(例:タロウ)" data-ini="giv"></div>
         <div class="row"><input type="text" placeholder="市町村(例:伊勢崎市)" data-ini="city" style="flex:1;width:auto"><select data-ini="stage" style="width:auto">${b.stages.map((s,i)=>`<option value="${i}">${esc(s.name)}</option>`).join('')}</select><button class="btn sm pri" data-act="addInitial" ${D}>追加</button></div></div>`+
@@ -623,6 +717,10 @@ document.addEventListener('click',e=>{
     case 'export':exportJson();return;case 'exportOld':{const blob=new Blob([JSON.stringify(S)],{type:'application/json'});const u=URL.createObjectURL(blob);const x=document.createElement('a');x.href=u;x.download=`すまいるくらぶ_${S.meta.year}${String(S.meta.month).padStart(2,'0')}_No${S.meta.no}.json`;document.body.appendChild(x);x.click();x.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);return}
     case 'import':$('#importFile').click();return;
     case 'reset':if(!confirm('いまの内容を消してサンプルに戻します。必要なら先に「名前を付けて保存」で控えを取ってください。'))return;S=sampleState();fh=null;DB.set('fileHandle',null).catch(()=>{});ui.fileDirty=false;fileStatus();break;
+    case 'ktOpen':ktBid=el.dataset.bid;$('#ktUrl').value=KT.url;$('#ktShift').value=String(KT.shift||0);$('#ktModal').hidden=false;if(KT.url)ktFetch();else{$('#ktMsg').textContent='最初に、読み取り用スクリプトのURLを貼り付けて「読み込む」を押してください。';$('#ktTable').innerHTML=''}return;
+    case 'ktFetch':ktFetch();return;
+    case 'ktApply':ktApply();return;
+    case 'ktClose':$('#ktModal').hidden=true;return;
     case 'saveFile':saveFile(false);return;
     case 'saveAs':saveFile(true);return;
     case 'openFile':openFile();return;
@@ -638,7 +736,7 @@ window.addEventListener('beforeprint',()=>{document.querySelectorAll('.pv .sheet
 window.addEventListener('afterprint',renderPreview);
 
 (async()=>{
-  await restoreHandle();
+  await restoreHandle();await loadKT();
   try{S=await DB.get('current')}catch(e){S=null}
   S=S&&S.v===2?load(S):sampleState();
   renderEditor();renderPreview();fileStatus();
@@ -646,7 +744,7 @@ window.addEventListener('afterprint',renderPreview);
 })();
 
 /* ============ 自動更新チェック(GitHub Pagesで開いている場合) ============ */
-const APP_VERSION='2026.10.22-1';
+const APP_VERSION='2026.10.26-1';
 async function checkUpdate(){
   if(!/^https?:/.test(location.protocol))return;
   try{const r=await fetch(location.pathname+'?vc='+Date.now(),{cache:'no-store'});if(!r.ok)return;

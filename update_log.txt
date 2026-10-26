@@ -1,16 +1,5 @@
 ============================================== 
-Update started: —ß˜a8”N10ŒŽ23“ú ‹à 18:20:51.75 
+Update started: —ß˜a8”N10ŒŽ26“ú ŒŽ 12:15:15.38 
 Folder: Z:\smileclub-tool 
 ============================================== 
-Overwrote index.html with: index - 2026-10-23T181936.746.html (77057 bytes, —ß˜a8”N10ŒŽ23“ú 18:19) 
- 
---- git commit --- 
-[main 77cc5e9] update
- 2 files changed, 78 insertions(+), 138 deletions(-)
- 
---- git push --- 
-To https://github.com/kitazume3432/smileclub-tool.git
-   2599bdd..77cc5e9  main -> main
-PUSH RESULT: SUCCESS 
-Update finished: —ß˜a8”N10ŒŽ23“ú ‹à 18:20:59.79 
-============================================== 
+Overwrote index.html with: index - 2026-10-26T121456.221.html (86500 bytes, —ß˜a8”N10ŒŽ26“ú 12:14) 
